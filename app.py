@@ -3,9 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# ==========================================
-# 1. PAGE CONFIG & STYLING
-# ==========================================
+#config
 st.set_page_config(page_title="ALLSTAT CO2 Prototype", layout="wide")
 
 # Custom CSS to make containers look uniform
@@ -16,9 +14,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ==========================================
-# 2. DATA LOADING (Cached for performance)
-# ==========================================
+
+#region load data
+
 @st.cache_data
 def load_data(file_path):
     """Loads and reshapes Excel sheets into Long Format for Plotly."""
@@ -54,9 +52,7 @@ except FileNotFoundError:
     st.error("Data file not found. Please ensure 'datasets/CO2.xlsx' exists.")
     st.stop()
 
-# ==========================================
-# 3. SIDEBAR FILTERS
-# ==========================================
+
 with st.sidebar:
     st.title("Project 1")
     st.info("**Legend & Info:** Visualizing CO2 datasets with imputed and scaled values.")
@@ -75,9 +71,9 @@ with st.sidebar:
     min_y, max_y = int(df_totals['Year'].min()), int(df_totals['Year'].max())
     year_range = st.slider("Time Range", min_y, max_y, (1990, max_y))
 
-# ==========================================
-# 4. FILTERING LOGIC
-# ==========================================
+
+#region filters
+
 # Apply filters to dataframes
 mask_totals = (df_totals['Country'].isin(selected_countries)) & (df_totals['Year'].between(*year_range))
 df_t_filtered = df_totals[mask_totals]
@@ -88,14 +84,12 @@ df_c_filtered = df_capita[mask_capita]
 mask_sector = (df_sector['Country'].isin(selected_countries)) & (df_sector['Year'].between(*year_range))
 df_s_filtered = df_sector[mask_sector]
 
-# ==========================================
-# 5. MAIN DASHBOARD UI
-# ==========================================
+#region dashboard
 st.title("CO2 Emissions Analysis Dashboard")
 
 tab1, tab2, tab3 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector"])
 
-# --- TAB 1: TOTAL EMISSIONS ---
+#region total emmisions
 with tab1:
     # Metrics
     m1, m2, m3 = st.columns(3)
@@ -126,23 +120,60 @@ with tab1:
     fig_event = px.area(df_t_filtered, x='Year', y='CO2', color='Country', title="Cumulative Growth")
     st.plotly_chart(fig_event, use_container_width=True)
 
-# --- TAB 2: PER CAPITA ---
+#region per capita
 with tab2:
     col_a, col_b = st.columns([2, 1])
     with col_a:
         st.subheader("Emissions per Capita Heatmap")
-        # Pivot for heatmap
         pivot_capita = df_c_filtered.pivot(index='Country', columns='Year', values='CO2_per_capita')
         fig_heat = px.imshow(pivot_capita, color_continuous_scale='Viridis', aspect="auto")
         st.plotly_chart(fig_heat, use_container_width=True)
         
     with col_b:
-        st.subheader("Top Emitters (Per Capita)")
+        st.subheader(f"Top 10 Emitters ({latest_year})")
         top_10 = df_c_filtered[df_c_filtered['Year'] == latest_year].nlargest(10, 'CO2_per_capita')
         fig_bar = px.bar(top_10, x='CO2_per_capita', y='Country', orientation='h', color='Country')
+        # Fix: Sort bars by value
+        fig_bar.update_layout(yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_bar, use_container_width=True)
+    
+    st.divider() # Visual separation
+    
+    st.subheader("Top 10 Race: Emitters Per Capita")
+    
+    # Logic Fix: Use filtered data and ensure proper sorting for animation
+    df_race = df_c_filtered.sort_values(['Year', 'CO2_per_capita'], ascending=[True, False])
+    df_race = df_race.groupby('Year').head(10).reset_index()
 
-# --- TAB 3: SECTORS ---
+    # Calculate a dynamic max for the X-axis based on selected range
+    x_limit = df_race['CO2_per_capita'].max() * 1.1
+
+    fig_race = px.bar(
+        df_race,
+        x="CO2_per_capita",
+        y="Country",
+        color="Country",
+        animation_frame="Year",
+        animation_group="Country",
+        orientation='h',
+        range_x=[0, x_limit],
+        labels={'CO2_per_capita': 'Tonnes/Capita'}
+    )
+
+    fig_race.update_layout(
+        yaxis={'categoryorder': 'total ascending'}, 
+        margin=dict(t=20, l=0, r=0, b=0),
+        height=500,
+        showlegend=False # Hide legend to save space since names are on Y axis
+    )
+
+    # Animation control
+    fig_race.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 600 
+    fig_race.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 300
+
+    st.plotly_chart(fig_race, use_container_width=True)
+
+#region sector analysis
 with tab3:
     col_x, col_y = st.columns(2)
     with col_x:
@@ -157,3 +188,5 @@ with tab3:
         sector_agg = df_s_filtered.groupby(['Year', 'Sector'])['CO2'].sum().reset_index()
         fig_area = px.area(sector_agg, x="Year", y="CO2", color="Sector")
         st.plotly_chart(fig_area, use_container_width=True)
+
+
