@@ -65,10 +65,42 @@ def add_events_to_fig(fig, events, selected_countries, year_range):
             annotation_hovertext=f"<b>{event['Event']} ({event['Year']})</b><br>{event['Description']}"
         )
 
+@st.cache_data
+def load_land_area_data(file_path):
+    df_land_area = pd.read_csv(file_path, skiprows=4)
+    df_land_area = df_land_area.melt(
+        id_vars=['Country Name', 'Country Code', 'Indicator Name', 'Indicator Code'],
+        var_name='Year',
+        value_name='Land area (sq. km)'
+    )
+    df_land_area['Year'] = pd.to_numeric(df_land_area['Year'], errors='coerce')
+    df_land_area.dropna(subset=['Year'], inplace=True)
+    df_land_area['Year'] = df_land_area['Year'].astype(int)
+    df_land_area.rename(columns={'Country Name': 'Country'}, inplace=True)
+    df_land_area['Land area (sq. km)'] = pd.to_numeric(df_land_area['Land area (sq. km)'], errors='coerce')
+    return df_land_area
+
+@st.cache_data
+def load_gdp_data(file_path):
+    df_gdp = pd.read_csv(file_path, skiprows=4)
+    df_gdp = df_gdp.melt(
+        id_vars=['Country Name', 'Country Code', 'Indicator Name', 'Indicator Code'],
+        var_name='Year',
+        value_name='GDP Growth (annual %)'
+    )
+    df_gdp['Year'] = pd.to_numeric(df_gdp['Year'], errors='coerce')
+    df_gdp.dropna(subset=['Year'], inplace=True)
+    df_gdp['Year'] = df_gdp['Year'].astype(int)
+    df_gdp.rename(columns={'Country Name': 'Country'}, inplace=True)
+    df_gdp['GDP Growth (annual %)'] = pd.to_numeric(df_gdp['GDP Growth (annual %)'], errors='coerce')
+    return df_gdp
+
 # Load data
 try:
     df_totals, df_capita, df_sector = load_data("datasets/CO2.xlsx")
     df_events = load_events_data("datasets/Top_20_GDP_CO2_Events_1970_2022.csv")
+    df_land_area = load_land_area_data("datasets/land_area_data/API_AG.LND.TOTL.K2_DS2_en_csv_v2_323.csv")
+    df_gdp_growth = load_gdp_data("datasets/gdp_data/API_NY.GDP.MKTP.KD.ZG_DS2_en_csv_v2_40824.csv")
 except FileNotFoundError:
     st.error("Data file not found. Please ensure the datasets directory contains 'CO2.xlsx' and the events CSV.")
     st.stop()
@@ -115,7 +147,7 @@ df_s_filtered = df_sector[mask_sector]
 
 # --- Dashboard UI ---
 st.title("CO2 Emissions Analysis Dashboard")
-tab1, tab2, tab3 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector"])
+tab1, tab2, tab3, tab4 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector", "GDP vs CO2"])
 
 # --- Tab 1: Total Emissions ---
 with tab1:
@@ -127,13 +159,35 @@ with tab1:
     m2.metric("Variance", f"{variance:,.2e}")
     m3.metric("Selected Countries", len(selected_countries))
 
-    # Graph Row 1: Treemap
-    st.subheader(f"Emissions Treemap ({latest_year})")
+    # Graph Row 1: Treemap (sized by Land Area, colored by CO2)
+    st.subheader(f"Emissions Treemap by Land Area ({latest_year})")
     if not df_t_filtered.empty:
-        fig_tree = px.treemap(df_t_filtered[df_t_filtered['Year'] == latest_year], 
-                             path=['Country'], values='CO2',
-                             color='CO2', color_continuous_scale='Reds')
-        st.plotly_chart(fig_tree, use_container_width=True)
+        # Filter land area data for the latest year and selected countries
+        df_land_area_latest = df_land_area[
+            (df_land_area['Year'] == latest_year) & 
+            (df_land_area['Country'].isin(selected_countries))
+        ]
+        
+        # Merge CO2 data with land area data
+        df_merged_for_treemap = pd.merge(
+            df_t_filtered[df_t_filtered['Year'] == latest_year],
+            df_land_area_latest[['Country', 'Land area (sq. km)']],
+            on='Country',
+            how='left'
+        )
+        
+        
+        # Drop rows where 'Land area (sq. km)' is NaN after merge
+        df_merged_for_treemap.dropna(subset=['Land area (sq. km)'], inplace=True)
+        
+        if df_merged_for_treemap.empty:
+            st.warning("No land area data available for the selected countries and year to display the treemap.")
+        else:
+            fig_tree = px.treemap(df_merged_for_treemap, 
+                                 path=['Country'], values='Land area (sq. km)',
+                                 color='CO2', color_continuous_scale='Reds',
+                                 hover_data={'CO2': ':.2f'})
+            st.plotly_chart(fig_tree, use_container_width=True)
 
     # Graph Row 2: Trend
     st.subheader("Emissions Trend Over Time")
@@ -203,3 +257,57 @@ with tab3:
                         x='CO2', y='Country', orientation='h', color='CO2',
                         color_continuous_scale='Viridis', title=f"Country Ranking in {selected_sector}")
         st.plotly_chart(fig_dom, use_container_width=True)
+
+# --- Tab 4: GDP vs CO2 ---
+with tab4:
+    st.subheader("CO2 Emissions vs. GDP Growth (Annual %)")
+    
+    # Allow user to select a single year for this plot
+    min_gdp_year = max(df_t_filtered['Year'].min(), df_gdp_growth['Year'].min())
+    max_gdp_year = min(df_t_filtered['Year'].max(), df_gdp_growth['Year'].max())
+    
+    if min_gdp_year > max_gdp_year:
+        st.warning("No overlapping years for CO2 emissions and GDP growth data with current filters.")
+        st.stop()
+        
+    gdp_year = st.slider("Select Year for GDP vs CO2 Plot", 
+                         min_gdp_year, max_gdp_year, max_gdp_year)
+    
+    st.subheader(f"CO2 Emissions vs. GDP Growth (Annual %) in {gdp_year}")
+
+    # Filter CO2 and GDP data for the selected year and countries
+    df_t_gdp_year = df_totals[
+        (df_totals['Country'].isin(selected_countries)) &
+        (df_totals['Year'] == gdp_year)
+    ]
+    df_gdp_gdp_year = df_gdp_growth[
+        (df_gdp_growth['Country'].isin(selected_countries)) &
+        (df_gdp_growth['Year'] == gdp_year)
+    ]
+    
+    # Merge CO2 totals with GDP growth data for the selected year
+    df_merged_gdp_co2 = pd.merge(
+        df_t_gdp_year,
+        df_gdp_gdp_year,
+        on=['Country', 'Year'],
+        how='inner'  # Use inner merge to only keep rows with both CO2 and GDP data
+    )
+    
+    # Drop rows with NaN values in either CO2 or GDP Growth (annual %)
+    df_merged_gdp_co2.dropna(subset=['CO2', 'GDP Growth (annual %)'], inplace=True)
+    
+    if df_merged_gdp_co2.empty:
+        st.warning(f"No combined CO2 and GDP growth data available for the selected countries in {gdp_year}.")
+    else:
+        fig_gdp_co2 = px.scatter(df_merged_gdp_co2, 
+                                 x='CO2', 
+                                 y='GDP Growth (annual %)', 
+                                 color='Country',
+                                 hover_name='Country',
+                                 hover_data={'Year': True, 
+                                               'CO2': ':.2f', 
+                                               'GDP Growth (annual %)': ':.2f'}
+                                )
+        fig_gdp_co2.update_layout(xaxis_title="CO2 Emissions (Mt)",
+                                 yaxis_title="GDP Growth (Annual %)")
+        st.plotly_chart(fig_gdp_co2, use_container_width=True)
