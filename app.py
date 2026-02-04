@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 
 #config
 st.set_page_config(page_title="ALLSTAT CO2 Prototype", layout="wide")
@@ -16,6 +15,15 @@ st.markdown("""
 
 
 #region load data
+
+@st.cache_data
+def load_events_data(file_path):
+    """Loads historical events data."""
+    df_events = pd.read_csv(file_path)
+    df_events['Year'] = pd.to_numeric(df_events['Year'], errors='coerce')
+    df_events.dropna(subset=['Year'], inplace=True)
+    df_events['Year'] = df_events['Year'].astype(int)
+    return df_events
 
 @st.cache_data
 def load_data(file_path):
@@ -45,9 +53,29 @@ def load_data(file_path):
         
     return df_totals, df_capita, df_sector
 
+def add_events_to_fig(fig, events, selected_countries, year_range):
+    """Adds historical events to a plotly figure."""
+    events_in_range = events[
+        (events['Year'].between(*year_range)) & 
+        (events['Country'].isin(selected_countries + ['Global']))
+    ]
+    
+    for _, event in events_in_range.iterrows():
+        fig.add_vline(
+            x=event['Year'], 
+            line_width=1, 
+            line_dash="dash", 
+            line_color="grey",
+            annotation_text=event['Event'],
+            annotation_position="top left",
+            annotation_font_size=10,
+            annotation_hovertext=f"<b>{event['Event']} ({event['Year']})</b><br>{event['Description']}"
+        )
+
 # Load the data
 try:
     df_totals, df_capita, df_sector = load_data("datasets/CO2.xlsx")
+    df_events = load_events_data("datasets/Top_20_GDP_CO2_Events_1970_2022.csv")
 except FileNotFoundError:
     st.error("Data file not found. Please ensure 'datasets/CO2.xlsx' exists.")
     st.stop()
@@ -62,6 +90,9 @@ with st.sidebar:
     # --- 1. Year Selection ---
     min_y, max_y = int(df_totals['Year'].min()), int(df_totals['Year'].max())
     year_range = st.slider("Time Range", min_y, max_y, (1990, max_y))
+
+    # --- Historic Events Toggle ---
+    show_events = st.checkbox("Show Historic Events", value=True)
 
     st.divider()
 
@@ -121,7 +152,6 @@ tab1, tab2, tab3 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector"])
 #region total emmisions
 with tab1:
     # Metrics
-    m1, m2, m3 = st.columns(3)
     avg_emissions = df_t_filtered['CO2'].mean()
     
     # Handle variance calculation for single data point
@@ -130,31 +160,34 @@ with tab1:
     else:
         variance = 0
     
-    m1.metric("Avg Emission", f"{avg_emissions:,.2f} Mt")
-    m2.metric("Variance", f"{variance:,.2e}")
-    m3.metric("Selected Countries", len(selected_countries))
+    st.metric("Avg Emission", f"{avg_emissions:,.2f} Mt")
+    st.metric("Variance", f"{variance:,.2e}")
+    st.metric("Selected Countries", len(selected_countries))
 
     # Visuals Row 1
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Emissions Treemap (Recent Year)")
-        if not df_t_filtered.empty:
-            latest_year = df_t_filtered['Year'].max()
-            fig_tree = px.treemap(df_t_filtered[df_t_filtered['Year'] == latest_year], 
-                                 path=['Country'], values='CO2',
-                                 color='CO2', color_continuous_scale='Reds')
-            st.plotly_chart(fig_tree, use_container_width=True)
-        else:
-            st.info("No data for Treemap")
-        
-    with col2:
-        st.subheader("Emissions Trend")
-        fig_line = px.line(df_t_filtered, x='Year', y='CO2', color='Country', markers=len(selected_countries) < 10)
-        st.plotly_chart(fig_line, use_container_width=True)
+    st.subheader("Emissions Treemap (Recent Year)")
+    if not df_t_filtered.empty:
+        latest_year = df_t_filtered['Year'].max()
+        fig_tree = px.treemap(df_t_filtered[df_t_filtered['Year'] == latest_year], 
+                             path=['Country'], values='CO2',
+                             color='CO2', color_continuous_scale='Reds')
+        st.plotly_chart(fig_tree, use_container_width=True)
+    else:
+        st.info("No data for Treemap")
+    
+    st.subheader("Emissions Trend")
+    fig_line = px.line(df_t_filtered, x='Year', y='CO2', color='Country', markers=len(selected_countries) < 10)
+    
+    if show_events:
+        add_events_to_fig(fig_line, df_events, selected_countries, year_range)
+
+    st.plotly_chart(fig_line, use_container_width=True)
 
     # Historic Events
     st.subheader("Cumulative Growth")
     fig_event = px.area(df_t_filtered, x='Year', y='CO2', color='Country')
+    if show_events:
+        add_events_to_fig(fig_event, df_events, selected_countries, year_range)
     st.plotly_chart(fig_event, use_container_width=True)
 
 #region per capita
