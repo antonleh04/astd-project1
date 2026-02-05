@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- Config ---
+#region config
 st.set_page_config(page_title="ALLSTAT CO2 Prototype", layout="wide")
 
 # Custom CSS for aesthetics
@@ -13,7 +13,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- Data Loading ---
+#region data
 @st.cache_data
 def load_events_data(file_path):
     df_events = pd.read_csv(file_path)
@@ -134,7 +134,7 @@ if not selected_countries:
     st.warning("Please select at least one country to view the dashboard.")
     st.stop()
 
-# --- Filtering Logic ---
+#region filter data
 mask_totals = (df_totals['Country'].isin(selected_countries)) & (df_totals['Year'].between(*year_range))
 df_t_filtered = df_totals[mask_totals]
 latest_year = df_t_filtered['Year'].max()
@@ -149,7 +149,7 @@ df_s_filtered = df_sector[mask_sector]
 st.title("CO2 Emissions Analysis Dashboard")
 tab1, tab2, tab3, tab4 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector", "GDP vs CO2"])
 
-# --- Tab 1: Total Emissions ---
+# region total emmisions
 with tab1:
     # Top Row: Metrics
     m1, m2, m3 = st.columns(3)
@@ -197,7 +197,7 @@ with tab1:
     st.plotly_chart(fig_line, use_container_width=True)
 
 
-# --- Tab 2: Per Capita ---
+# region per capita
 with tab2:
     # Graph Row 1: Heatmap
     st.subheader("Emissions per Capita Heatmap")
@@ -221,7 +221,7 @@ with tab2:
         fig_race.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 600 
         st.plotly_chart(fig_race, use_container_width=True)
 
-# --- Tab 3: Sector Analysis ---
+# region sector analysis
 with tab3:
     # Graph Row 1: Sector Treemap
     st.subheader(f"Regional Sector Breakdown ({latest_year})")
@@ -258,7 +258,7 @@ with tab3:
                         color_continuous_scale='Viridis', title=f"Country Ranking in {selected_sector}")
         st.plotly_chart(fig_dom, use_container_width=True)
 
-# --- Tab 4: GDP vs CO2 ---
+# region gdp vs co2
 with tab4:
     st.subheader("CO2 Emissions vs. GDP Growth (Annual %)")
     
