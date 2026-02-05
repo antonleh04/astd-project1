@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
+from statsmodels.tsa.stattools import ccf
 
 #region config
 st.set_page_config(page_title="ALLSTAT CO2 Prototype", layout="wide")
@@ -148,7 +150,7 @@ df_s_filtered = df_sector[mask_sector]
 
 # --- Dashboard UI ---
 st.title("CO2 Emissions Analysis Dashboard")
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector", "GDP vs CO2", "Development Trajectories", "Sectoral Fingerprint"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector", "GDP vs CO2", "Development Trajectories", "Sectoral Fingerprint", "Cross-Correlation Analysis"])
 
 # region total emmisions
 with tab1:
@@ -471,3 +473,229 @@ with tab6:
         else:
             comparison_text = "Compare the shapes to see structural differences in sectoral profiles across countries."
         st.info(f"💡 **How to read this chart:** Each axis represents a sector. The distance from the center shows the emission level. {comparison_text}")
+
+# region cross-correlation analysis
+with tab7:
+    st.subheader("Cross-Correlation Analysis: GDP Growth vs CO2 Emissions")
+    st.markdown("**Analyze the temporal relationship between economic growth and emissions changes.**")
+    
+    # Country selection for analysis
+    if len(selected_countries) == 0:
+        st.warning("Please select at least 1 country in the sidebar for cross-correlation analysis.")
+        st.stop()
+    
+    # Select one country for detailed analysis (CCF requires single time series)
+    if len(selected_countries) == 1:
+        analysis_country = selected_countries[0]
+        st.info(f"📊 **Analyzing:** {analysis_country}")
+    else:
+        st.info("💡 **Note:** Cross-correlation analysis works with one country at a time. Select a country from your filtered list:")
+        analysis_country = st.selectbox(
+            "Select Country for Analysis",
+            selected_countries,
+            key="ccf_country"
+        )
+    
+    st.divider()
+    
+    # Prepare CO2 data (calculate YoY percentage change)
+    co2_country = df_totals[df_totals['Country'] == analysis_country][['Year', 'CO2']].sort_values('Year')
+    co2_country = co2_country.dropna()
+    co2_country['CO2_YoY_Change'] = co2_country['CO2'].pct_change() * 100
+    
+    # Prepare GDP data (already in growth rate format)
+    gdp_country = df_gdp_growth[df_gdp_growth['Country'] == analysis_country][['Year', 'GDP Growth (annual %)']].sort_values('Year')
+    gdp_country = gdp_country.dropna()
+    
+    # Merge datasets
+    merged_data = pd.merge(
+        co2_country[['Year', 'CO2_YoY_Change']],
+        gdp_country[['Year', 'GDP Growth (annual %)']],
+        on='Year',
+        how='inner'
+    )
+    
+    if len(merged_data) < 10:
+        st.warning(f"Insufficient data for {analysis_country}. Need at least 10 overlapping years for meaningful analysis.")
+        st.stop()
+    
+    # Remove any remaining NaN values
+    merged_data = merged_data.dropna()
+    
+    if len(merged_data) < 10:
+        st.warning(f"After removing missing values, insufficient data remains for {analysis_country}.")
+        st.stop()
+    
+    # Display data summary
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Years Available", len(merged_data))
+    col2.metric("Year Range", f"{int(merged_data['Year'].min())}-{int(merged_data['Year'].max())}")
+    col3.metric("Data Points", len(merged_data))
+    
+    st.divider()
+    
+    # Time series comparison visualization
+    st.subheader("📈 Time Series Comparison")
+    
+    # Create dual-axis line chart
+    fig_timeseries = go.Figure()
+    
+    # Add CO2 YoY Change
+    fig_timeseries.add_trace(go.Scatter(
+        x=merged_data['Year'],
+        y=merged_data['CO2_YoY_Change'],
+        mode='lines+markers',
+        name='CO2 YoY Change (%)',
+        line=dict(color='#EF553B', width=2),
+        yaxis='y'
+    ))
+    
+    # Add GDP Growth
+    fig_timeseries.add_trace(go.Scatter(
+        x=merged_data['Year'],
+        y=merged_data['GDP Growth (annual %)'],
+        mode='lines+markers',
+        name='GDP Growth (%)',
+        line=dict(color='#636EFA', width=2),
+        yaxis='y2'
+    ))
+    
+    # Update layout with dual y-axes
+    fig_timeseries.update_layout(
+        title=f"GDP Growth vs CO2 Emissions Change Over Time<br>{analysis_country}",
+        xaxis=dict(title="Year"),
+        yaxis=dict(
+            title=dict(text="CO2 YoY Change (%)", font=dict(color='#EF553B')),
+            tickfont=dict(color='#EF553B')
+        ),
+        yaxis2=dict(
+            title=dict(text="GDP Growth (%)", font=dict(color='#636EFA')),
+            tickfont=dict(color='#636EFA'),
+            overlaying='y',
+            side='right'
+        ),
+        template="plotly_white",
+        height=400,
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    st.plotly_chart(fig_timeseries, use_container_width=True)
+    
+    st.divider()
+    
+    # Lag selection slider
+    st.subheader("🔍 Cross-Correlation Analysis")
+    max_possible_lag = min(10, len(merged_data) // 3)
+    max_lag = st.slider(
+        "Select Maximum Lag (years)",
+        min_value=1,
+        max_value=max_possible_lag,
+        value=min(5, max_possible_lag),
+        help="Adjust the range of time lags to analyze. Larger values show longer-term relationships."
+    )
+    
+    # Calculate cross-correlation
+    
+    # Extract series
+    gdp_series = merged_data['GDP Growth (annual %)'].values
+    co2_series = merged_data['CO2_YoY_Change'].values
+    
+    # Calculate CCF
+    try:
+        ccf_values = ccf(co2_series, gdp_series, adjusted=False)
+        
+        # Create lag range from negative to positive
+        lags = np.arange(-max_lag, max_lag + 1)
+        ccf_subset = []
+        
+        # CCF returns values for lags 0, 1, 2, ... we need to manually compute negative lags
+        for lag in lags:
+            if lag < 0:
+                # Negative lag: GDP leads CO2
+                ccf_subset.append(ccf(gdp_series, co2_series, adjusted=False)[abs(lag)])
+            else:
+                # Positive lag: CO2 leads GDP (or they're synchronous at 0)
+                ccf_subset.append(ccf_values[lag])
+        
+        # Create visualization
+        fig_ccf = go.Figure()
+        
+        # Add lollipop stems
+        for i, (lag, corr) in enumerate(zip(lags, ccf_subset)):
+            fig_ccf.add_trace(go.Scatter(
+                x=[lag, lag],
+                y=[0, corr],
+                mode='lines',
+                line=dict(color='lightgray', width=2),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+        
+        # Add lollipop heads
+        colors = ['red' if c < 0 else 'green' for c in ccf_subset]
+        fig_ccf.add_trace(go.Scatter(
+            x=lags,
+            y=ccf_subset,
+            mode='markers',
+            marker=dict(size=12, color=colors),
+            name='Correlation',
+            hovertemplate='<b>Lag: %{x} years</b><br>Correlation: %{y:.3f}<extra></extra>'
+        ))
+        
+        # Add zero line
+        fig_ccf.add_hline(y=0, line_dash="dash", line_color="black", line_width=1)
+        
+        # Update layout
+        fig_ccf.update_layout(
+            title=f"Cross-Correlation: GDP Growth vs CO2 Emissions Change<br>{analysis_country}",
+            xaxis_title="Lag (years)",
+            yaxis_title="Correlation Coefficient",
+            template="plotly_white",
+            height=500,
+            xaxis=dict(tickmode='linear', tick0=-max_lag, dtick=1),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig_ccf, use_container_width=True)
+        
+        # Find peak correlation and its lag
+        peak_idx = np.argmax(np.abs(ccf_subset))
+        peak_lag = lags[peak_idx]
+        peak_corr = ccf_subset[peak_idx]
+        
+        # Analytical insights
+        st.subheader("📊 Interpretation")
+        
+        if peak_lag == 0:
+            interpretation = f"**Peak at Lag 0** (r = {peak_corr:.3f}): GDP growth and CO2 emissions changes are **synchronous**. Economic activity and emissions respond simultaneously."
+        elif peak_lag < 0:
+            interpretation = f"**Peak at Lag {peak_lag}** (r = {peak_corr:.3f}): GDP growth **leads** CO2 emissions by {abs(peak_lag)} year(s). Economic changes occur first, followed by emission changes."
+        else:
+            interpretation = f"**Peak at Lag +{peak_lag}** (r = {peak_corr:.3f}): CO2 emissions changes **lead** GDP growth by {peak_lag} year(s). This unusual pattern might indicate structural economic factors."
+        
+        st.info(interpretation)
+        
+        # Additional context
+        st.markdown("""
+        **Understanding the Analysis:**
+        - **Positive correlation (green)**: When GDP grows, CO2 emissions tend to increase.
+        - **Negative correlation (red)**: When GDP grows, CO2 emissions tend to decrease (decoupling).
+        - **Lag**: Time offset between GDP and CO2 changes.
+            - Negative lag: GDP changes happen first (GDP leads).
+            - Positive lag: CO2 changes happen first (CO2 leads).
+            - Zero lag: Changes occur simultaneously.
+        
+        💡 **Note:** This analysis uses detrended data (year-over-year changes) to reveal the true relationship 
+        rather than just showing that both variables generally increase over time.
+        """)
+        
+    except Exception as e:
+        st.error(f"Error calculating cross-correlation: {str(e)}")
+        st.info("This might occur if the data has insufficient variation or contains outliers.")
