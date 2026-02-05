@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 #region config
 st.set_page_config(page_title="ALLSTAT CO2 Prototype", layout="wide")
@@ -147,7 +148,7 @@ df_s_filtered = df_sector[mask_sector]
 
 # --- Dashboard UI ---
 st.title("CO2 Emissions Analysis Dashboard")
-tab1, tab2, tab3, tab4 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector", "GDP vs CO2"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector", "GDP vs CO2", "Development Trajectories", "Sectoral Fingerprint"])
 
 # region total emmisions
 with tab1:
@@ -311,3 +312,162 @@ with tab4:
         fig_gdp_co2.update_layout(xaxis_title="CO2 Emissions (Mt)",
                                  yaxis_title="GDP Growth (Annual %)")
         st.plotly_chart(fig_gdp_co2, use_container_width=True)
+
+# region development trajectories
+with tab5:
+    st.subheader("CO2 Development Trajectories")
+    st.markdown("**Connected scatter plot showing how countries evolved from per capita to total emissions over time.**")
+    
+    # Merge total emissions and per capita data
+    df_trajectory = pd.merge(
+        df_t_filtered[['Country', 'Year', 'CO2']],
+        df_c_filtered[['Country', 'Year', 'CO2_per_capita']],
+        on=['Country', 'Year'],
+        how='inner'
+    )
+    
+    if df_trajectory.empty:
+        st.warning("No trajectory data available for the selected countries and time range.")
+    else:
+        # Create connected scatter plot
+        fig_trajectory = px.line(
+            df_trajectory.sort_values(['Country', 'Year']),
+            x='CO2_per_capita',
+            y='CO2',
+            color='Country',
+            markers=True,
+            hover_data={
+                'Country': True,
+                'Year': True,
+                'CO2': ':.2f',
+                'CO2_per_capita': ':.2f'
+            },
+            labels={
+                'CO2_per_capita': 'Per Capita Emissions (t CO2/cap/yr)',
+                'CO2': 'Total Emissions (Mt CO2/yr)'
+            }
+        )
+        
+        # Styling
+        fig_trajectory.update_layout(
+            template='plotly_white',
+            yaxis_range=[0, df_trajectory['CO2'].max() * 1.1],
+            hovermode='closest'
+        )
+        
+        st.plotly_chart(fig_trajectory, use_container_width=True)
+        
+        # Add explanation
+        st.info("💡 **How to read this chart:** Each line represents a country's trajectory over time. " +
+                "Movement to the right indicates increasing per capita emissions, while upward movement " +
+                "shows increasing total emissions. The markers represent individual years.")
+
+# region sectoral fingerprint
+with tab6:
+    st.subheader("Sectoral Emission Fingerprint")
+    st.markdown("**Compare the emission profiles of two countries across different sectors.**")
+    
+    # Get available years from sector data
+    min_sector_year = int(df_sector['Year'].min())
+    max_sector_year = int(df_sector['Year'].max())
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        radar_year = st.slider("Select Year for Comparison", 
+                               min_sector_year, max_sector_year, max_sector_year,
+                               key="radar_year")
+    
+    with col2:
+        show_percentage = st.radio("Display Mode", 
+                                   ["Absolute Values (Mt CO2)", "Relative Percentage (%)"],
+                                   index=1)
+    
+    st.divider()
+    
+    # Use the globally selected countries from sidebar
+    if len(selected_countries) == 0:
+        st.warning("Please select at least 1 country in the sidebar to view sectoral profile.")
+        st.stop()
+    
+    # Display which countries are being compared
+    if len(selected_countries) == 1:
+        st.info(f"📊 **Viewing:** {selected_countries[0]}")
+    else:
+        st.info(f"📊 **Comparing {len(selected_countries)} countries:** {', '.join(selected_countries)}")
+    
+    # Filter sector data for selected year and all selected countries
+    df_radar = df_sector[
+        (df_sector['Year'] == radar_year) & 
+        (df_sector['Country'].isin(selected_countries))
+    ]
+    
+    if df_radar.empty:
+        st.warning(f"No sector data available for the selected country/countries in {radar_year}.")
+    else:
+        # Group by country and sector
+        df_radar_grouped = df_radar.groupby(['Country', 'Sector'])['CO2'].sum().reset_index()
+        
+        # Calculate percentages if needed
+        if "Percentage" in show_percentage:
+            # Calculate total emissions per country
+            country_totals = df_radar_grouped.groupby('Country')['CO2'].sum().to_dict()
+            df_radar_grouped['Value'] = df_radar_grouped.apply(
+                lambda row: (row['CO2'] / country_totals[row['Country']]) * 100, axis=1
+            )
+            value_label = "Percentage (%)"
+        else:
+            df_radar_grouped['Value'] = df_radar_grouped['CO2']
+            value_label = "Emissions (Mt CO2)"
+        
+        # Get all sectors
+        all_sectors = sorted(df_radar_grouped['Sector'].unique())
+        
+        # Create radar chart
+        fig_radar = go.Figure()
+        
+        # Add trace for each selected country
+        max_value = 0
+        for country in selected_countries:
+            df_country = df_radar_grouped[df_radar_grouped['Country'] == country]
+            if not df_country.empty:
+                values = [df_country[df_country['Sector'] == sector]['Value'].iloc[0] 
+                         if not df_country[df_country['Sector'] == sector].empty else 0 
+                         for sector in all_sectors]
+                
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=values,
+                    theta=all_sectors,
+                    fill='toself',
+                    name=country
+                ))
+                
+                max_value = max(max_value, max(values) if values else 0)
+        
+        # Create title based on number of countries
+        if len(selected_countries) == 1:
+            title_text = f"Sectoral Profile: {selected_countries[0]} ({radar_year})"
+        else:
+            title_text = f"Sectoral Comparison: {len(selected_countries)} Countries ({radar_year})"
+        
+        # Update layout
+        fig_radar.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, max_value * 1.1]
+                )
+            ),
+            showlegend=True,
+            title=title_text,
+            height=600
+        )
+        
+        st.plotly_chart(fig_radar, use_container_width=True)
+        
+        # Add insights
+        if len(selected_countries) == 1:
+            comparison_text = "The shape reveals the sectoral structure of emissions."
+        else:
+            comparison_text = "Compare the shapes to see structural differences in sectoral profiles across countries."
+        st.info(f"💡 **How to read this chart:** Each axis represents a sector. The distance from the center shows the emission level. {comparison_text}")
