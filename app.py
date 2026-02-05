@@ -17,30 +17,68 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 #region data
+# Country name normalization to match CO2 dataset naming convention
+@st.cache_data
+def get_country_name_mapping():
+    """Create mapping from World Bank country names to CO2 dataset names"""
+    return {
+        # World Bank name -> CO2 dataset name
+        'Italy': 'Italy, San Marino and the Holy See',
+        'Russian Federation': 'Russia',
+        'France': 'France and Monaco',
+        'Spain': 'Spain and Andorra',
+        'Switzerland': 'Switzerland and Liechtenstein',
+        'Israel': 'Israel and Palestine, State of',
+        # Add more mappings as needed
+        'Korea, Rep.': 'South Korea',
+        'Korea, Dem. People\'s Rep.': 'North Korea',
+        'United States': 'United States',
+        'United Kingdom': 'United Kingdom',
+        'China': 'China',
+        'Germany': 'Germany',
+        'Japan': 'Japan',
+        'India': 'India',
+        'Canada': 'Canada',
+        'Australia': 'Australia',
+        'Brazil': 'Brazil',
+        'Mexico': 'Mexico',
+        # Add common USA variants that might appear in other datasets
+        'USA': 'United States',
+        'US': 'United States',
+        'United States of America': 'United States',
+    }
+
+def normalize_country_names(df, country_column='Country'):
+    """Normalize country names in dataframe to match CO2 dataset naming"""
+    mapping = get_country_name_mapping()
+    df[country_column] = df[country_column].map(lambda x: mapping.get(x, x))
+    return df
+
 @st.cache_data
 def load_events_data(file_path):
     df_events = pd.read_csv(file_path)
     df_events['Year'] = pd.to_numeric(df_events['Year'], errors='coerce')
     df_events.dropna(subset=['Year'], inplace=True)
     df_events['Year'] = df_events['Year'].astype(int)
+    df_events = normalize_country_names(df_events, 'Country')
     return df_events
 
 @st.cache_data
-def load_data(file_path):
-    xlsx = pd.ExcelFile(file_path)
+def load_data(co2_data_dir):
+    """Load CO2 data from CSV files instead of Excel"""
     
     # Process Total Emissions
-    df_totals = xlsx.parse('fossil_CO2_totals_by_country').melt(
+    df_totals = pd.read_csv(f"{co2_data_dir}/fossil_CO2_totals_by_country.csv").melt(
         id_vars=['ISOcode', 'Country'], var_name='Year', value_name='CO2'
     )
     
     # Process Per Capita
-    df_capita = xlsx.parse('fossil_CO2_per_capita_by_countr').melt(
+    df_capita = pd.read_csv(f"{co2_data_dir}/fossil_CO2_per_capita_by_country.csv").melt(
         id_vars=['ISOcode', 'Country'], var_name='Year', value_name='CO2_per_capita'
     )
     
     # Process Sector Data
-    df_sector = xlsx.parse('fossil_CO2_by_sector_and_countr').melt(
+    df_sector = pd.read_csv(f"{co2_data_dir}/fossil_CO2_by_sector_and_country.csv").melt(
         id_vars=['Sector', 'ISOcode', 'Country'], var_name='Year', value_name='CO2'
     )
     
@@ -81,6 +119,7 @@ def load_land_area_data(file_path):
     df_land_area['Year'] = df_land_area['Year'].astype(int)
     df_land_area.rename(columns={'Country Name': 'Country'}, inplace=True)
     df_land_area['Land area (sq. km)'] = pd.to_numeric(df_land_area['Land area (sq. km)'], errors='coerce')
+    df_land_area = normalize_country_names(df_land_area, 'Country')
     return df_land_area
 
 @st.cache_data
@@ -96,22 +135,24 @@ def load_gdp_data(file_path):
     df_gdp['Year'] = df_gdp['Year'].astype(int)
     df_gdp.rename(columns={'Country Name': 'Country'}, inplace=True)
     df_gdp['GDP Growth (annual %)'] = pd.to_numeric(df_gdp['GDP Growth (annual %)'], errors='coerce')
+    df_gdp = normalize_country_names(df_gdp, 'Country')
     return df_gdp
 
-# Load data
+# Load data - Country names are automatically normalized to match CO2 dataset naming
+# CO2 data is now loaded from CSV files instead of Excel for better performance
 try:
-    df_totals, df_capita, df_sector = load_data("datasets/CO2.xlsx")
+    df_totals, df_capita, df_sector = load_data("datasets/co2_data")
     df_events = load_events_data("datasets/Top_20_GDP_CO2_Events_1970_2022.csv")
     df_land_area = load_land_area_data("datasets/land_area_data/API_AG.LND.TOTL.K2_DS2_en_csv_v2_323.csv")
     df_gdp_growth = load_gdp_data("datasets/gdp_data/API_NY.GDP.MKTP.KD.ZG_DS2_en_csv_v2_40824.csv")
-except FileNotFoundError:
-    st.error("Data file not found. Please ensure the datasets directory contains 'CO2.xlsx' and the events CSV.")
+except FileNotFoundError as e:
+    st.error(f"Data file not found: {e}. Please ensure all dataset files are present.")
     st.stop()
 
 # --- Sidebar Filters ---
 with st.sidebar:
-    st.title("Project 1")
-    st.info("**Legend & Info:** Visualizing CO2 datasets with imputed and scaled values.")
+    st.title("CO2 Emissions Dashboard")
+    st.info("**Info:** CO2 data visualization across all datasets.")
     
     st.header("Global Filters")
     min_y, max_y = int(df_totals['Year'].min()), int(df_totals['Year'].max())
@@ -130,7 +171,7 @@ with st.sidebar:
         selected_countries = available_countries
         st.info(f"Including all {len(available_countries)} countries/regions.")
     else:
-        defaults = [c for c in ["USA", "China", "India"] if c in available_countries]
+        defaults = [c for c in ["United States", "China", "India"] if c in available_countries]
         selected_countries = st.multiselect("Select Specific Countries", available_countries, default=defaults)
 
 if not selected_countries:
