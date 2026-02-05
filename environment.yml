@@ -1,0 +1,9 @@
+name: astd-project1
+channels:
+  - defaults
+dependencies:
+  - pandas
+  - openpyxl
+  - plotly
+  - streamlit
+
