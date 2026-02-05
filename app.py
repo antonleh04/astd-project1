@@ -186,10 +186,25 @@ with tab1:
         if df_merged_for_treemap.empty:
             st.warning("No land area data available for the selected countries and year to display the treemap.")
         else:
+            # Use log scale for CO2 to better visualize differences
+            df_merged_for_treemap['CO2_log'] = np.log10(df_merged_for_treemap['CO2'] + 1)
+            
             fig_tree = px.treemap(df_merged_for_treemap, 
-                                 path=['Country'], values='Land area (sq. km)',
-                                 color='CO2', color_continuous_scale='Reds',
-                                 hover_data={'CO2': ':.2f'})
+                                 path=['Country'], 
+                                 values='Land area (sq. km)',
+                                 color='CO2_log', 
+                                 color_continuous_scale='Reds',
+                                 hover_data={'CO2': ':.2f', 'CO2_log': False},
+                                 labels={'CO2_log': 'CO2 (log scale)'})
+            
+            # Update colorbar to show original values
+            fig_tree.update_coloraxes(
+                colorbar_title_text="CO2 Emissions<br>(Mt, log scale)",
+                colorbar_tickmode='array',
+                colorbar_tickvals=np.log10([1, 10, 100, 1000, 10000]),
+                colorbar_ticktext=['1', '10', '100', '1k', '10k']
+            )
+            
             st.plotly_chart(fig_tree, use_container_width=True)
 
     # Graph Row 2: Trend
