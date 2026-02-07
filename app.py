@@ -601,31 +601,39 @@ with tab2:
     if min_gdp_year > max_gdp_year:
         st.warning("No overlapping years for CO2 and GDP data with current filters.")
     else:
-        gdp_year = st.slider(
-            "Select Year", min_gdp_year, max_gdp_year, max_gdp_year, key="gdp_yr",
-        )
-
-        df_co2_yr = df_totals[
+        # Build merged CO2 × GDP data for ALL years in the overlapping range
+        gdp_years_range = range(min_gdp_year, max_gdp_year + 1)
+        df_co2_all = df_totals[
             (df_totals["Country"].isin(selected_countries))
-            & (df_totals["Year"] == gdp_year)
+            & (df_totals["Year"].isin(gdp_years_range))
         ]
-        df_gdp_yr = df_gdp_growth[
+        df_gdp_all = df_gdp_growth[
             (df_gdp_growth["Country"].isin(selected_countries))
-            & (df_gdp_growth["Year"] == gdp_year)
+            & (df_gdp_growth["Year"].isin(gdp_years_range))
         ]
         df_merged = pd.merge(
-            df_co2_yr, df_gdp_yr, on=["Country", "Year"], how="inner",
+            df_co2_all, df_gdp_all, on=["Country", "Year"], how="inner",
         ).dropna(subset=["CO2", "GDP Growth (annual %)"])
 
         if df_merged.empty:
-            st.info(f"No combined data for selected countries in {gdp_year}.")
+            st.info("No combined data for selected countries in the available year range.")
         else:
+            # Sort by year so the animation plays chronologically
+            df_merged = df_merged.sort_values("Year")
+            # Compute global axis limits so the view stays stable across frames
+            x_max = df_merged["CO2"].max() * 1.10
+            y_min = df_merged["GDP Growth (annual %)"].min() * 1.15
+            y_max = df_merged["GDP Growth (annual %)"].max() * 1.15
+
             fig_scatter = px.scatter(
                 df_merged,
                 x="CO2", y="GDP Growth (annual %)",
                 color="Country", hover_name="Country",
                 size="CO2", size_max=40,
+                animation_frame="Year", animation_group="Country",
                 color_discrete_sequence=CLIMATE_QUALITATIVE,
+                range_x=[0, x_max],
+                range_y=[y_min, y_max],
                 hover_data={
                     "Year": True,
                     "CO2": ":.2f",
@@ -636,9 +644,12 @@ with tab2:
                 template=PLOTLY_TEMPLATE,
                 xaxis_title="CO2 Emissions (Mt)",
                 yaxis_title="GDP Growth (Annual %)",
-                height=460,
+                height=520,
                 margin=CHART_MARGIN,
             )
+            # Slow down animation for readability
+            fig_scatter.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"] = 600
+            fig_scatter.layout.updatemenus[0].buttons[0].args[1]["transition"]["duration"] = 300
             st.plotly_chart(fig_scatter, use_container_width=True)
 
     st.divider()
