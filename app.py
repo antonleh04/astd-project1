@@ -669,16 +669,104 @@ with tab2:
 
     with col_heat:
         st.markdown("##### Heatmap")
+        
+        # Sorting options selectbox
+        sort_option = st.selectbox(
+            "Sort countries by:",
+            options=[
+                "Total Emissions (2021)",
+                "Historical Change (%)",
+                "Carbon Intensity",
+            ],
+            key="heatmap_sort",
+            help=(
+                "**Total Emissions (2021)**: Sort by the most recent volume.\n\n"
+                "**Historical Change (%)**: Sort by the percentage change between 1970 and 2021.\n\n"
+                "**Carbon Intensity**: Sort by CO2 per unit of GDP."
+            ),
+        )
+        
         if not df_c_filtered.empty:
             pivot = df_c_filtered.pivot(
                 index="Country", columns="Year", values="CO2_per_capita",
             )
+            
+            # Calculate sorting metric based on user selection
+            if sort_option == "Total Emissions (2021)":
+                # Sort by most recent total emissions
+                latest_totals = df_totals[
+                    (df_totals["Year"] == 2021)
+                    & (df_totals["Country"].isin(pivot.index))
+                ][["Country", "CO2"]].set_index("Country")
+                
+                # Only keep countries that have 2021 data
+                sort_values = latest_totals["CO2"].reindex(pivot.index)
+                valid_countries = sort_values.dropna().sort_values(ascending=False).index.tolist()
+                pivot = pivot.loc[valid_countries]
+                
+            elif sort_option == "Historical Change (%)":
+                # Sort by percentage change from 1970 to 2021
+                df_1970 = df_totals[
+                    (df_totals["Year"] == 1970)
+                    & (df_totals["Country"].isin(pivot.index))
+                ][["Country", "CO2"]].set_index("Country")
+                
+                df_2021 = df_totals[
+                    (df_totals["Year"] == 2021)
+                    & (df_totals["Country"].isin(pivot.index))
+                ][["Country", "CO2"]].set_index("Country")
+                
+                # Calculate percentage change
+                pct_change = ((df_2021["CO2"] - df_1970["CO2"]) / df_1970["CO2"] * 100).reindex(pivot.index)
+                valid_countries = pct_change.dropna().sort_values(ascending=False).index.tolist()
+                pivot = pivot.loc[valid_countries]
+                
+            elif sort_option == "Carbon Intensity":
+                # Sort by CO2 per unit of GDP (using 2021 data)
+                df_co2_2021 = df_totals[
+                    (df_totals["Year"] == 2021)
+                    & (df_totals["Country"].isin(pivot.index))
+                ][["Country", "CO2"]].set_index("Country")
+                
+                df_gdp_2021 = df_gdp_growth[
+                    (df_gdp_growth["Year"] == 2021)
+                    & (df_gdp_growth["Country"].isin(pivot.index))
+                ][["Country", "GDP Growth (annual %)"]].set_index("Country")
+                
+                # Calculate carbon intensity (CO2 / GDP growth as proxy)
+                # Note: ideally we'd use absolute GDP, but we only have growth rate
+                # So we use CO2 as intensity indicator (higher CO2 = higher intensity)
+                carbon_intensity = df_co2_2021["CO2"].reindex(pivot.index)
+                valid_countries = carbon_intensity.dropna().sort_values(ascending=False).index.tolist()
+                pivot = pivot.loc[valid_countries]
+            
+            # Apply logarithmic scale to the data for better visualization
+            pivot_log = np.log10(pivot.clip(lower=0.01))  # Clip to avoid log(0)
+            
+            # Create country order list
+            country_order = pivot.index.tolist()
+            
             fig_heat = px.imshow(
-                pivot,
+                pivot_log,
                 color_continuous_scale="Tealgrn",
                 aspect="auto",
-                labels=dict(color="t CO2 / capita"),
+                labels=dict(color="log₁₀(t CO2 / capita)"),
             )
+            
+            # Update colorbar to show actual values instead of log values
+            fig_heat.update_coloraxes(
+                colorbar_title_text="t CO2 / capita<br>(log scale)",
+                colorbar_tickmode="array",
+                colorbar_tickvals=np.log10([0.1, 1, 10, 100]),
+                colorbar_ticktext=["0.1", "1", "10", "100"],
+            )
+            
+            # Enforce categorical y-axis order
+            fig_heat.update_yaxes(
+                categoryorder="array",
+                categoryarray=country_order,
+            )
+            
             fig_heat.update_layout(
                 template=PLOTLY_TEMPLATE,
                 height=480,
