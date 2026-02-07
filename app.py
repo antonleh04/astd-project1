@@ -402,6 +402,20 @@ with st.sidebar:
     st.divider()
     st.caption(f"**{len(selected_countries)}** countries selected")
 
+    # ── Timeline Settings ─────────────────────────────────────────────────
+    st.header("\U0001F4C5 Timeline")
+    show_events = st.checkbox(
+        "Show Historic Events", value=False, key="evt_global",
+    )
+    if show_events:
+        categories = sorted(df_events["Country"].unique())
+        evt_cats = st.multiselect(
+            "Filter by origin", categories, default=categories,
+            key="evt_cats_global",
+        )
+    else:
+        evt_cats = []
+
 # Guard: nothing to show without at least one country
 if not selected_countries:
     st.warning("Please select at least one country to view the dashboard.")
@@ -477,9 +491,6 @@ with tab1:
 
     st.divider()
 
-    # ── Event overlay controls ───────────────────────────────────────────────
-    show_events_t1, evt_cats_t1 = render_event_controls("t1", df_events)
-
     # ── Emissions trend (line chart) ─────────────────────────────────────────
     st.subheader("Emissions Trend Over Time")
 
@@ -512,8 +523,8 @@ with tab1:
     )
 
     # Overlay historic events if the user toggled them on
-    if show_events_t1:
-        events_sub = df_events[df_events["Country"].isin(evt_cats_t1)]
+    if show_events:
+        events_sub = df_events[df_events["Country"].isin(evt_cats)]
         add_events_to_fig(fig_trend, events_sub, selected_countries, year_range)
 
     st.plotly_chart(fig_trend, use_container_width=True)
@@ -569,8 +580,6 @@ with tab1:
 # TAB 2 — EQUITY & ECONOMY
 # ─────────────────────────────────────────────────────────────────────────────
 with tab2:
-
-    show_events_t2, evt_cats_t2 = render_event_controls("t2", df_events)
 
     # ── GDP vs CO2 scatter (bubble chart) ────────────────────────────────────
     st.subheader("CO2 Emissions vs. GDP Growth")
@@ -767,8 +776,8 @@ with tab2:
             margin=dict(l=50, r=50, t=30, b=40),
         )
 
-        if show_events_t2:
-            events_sub = df_events[df_events["Country"].isin(evt_cats_t2)]
+        if show_events:
+            events_sub = df_events[df_events["Country"].isin(evt_cats)]
             add_events_to_fig(fig_ts, events_sub, [analysis_country], year_range)
 
         st.plotly_chart(fig_ts, use_container_width=True)
@@ -863,8 +872,6 @@ with tab2:
 # ─────────────────────────────────────────────────────────────────────────────
 with tab3:
 
-    show_events_t3, evt_cats_t3 = render_event_controls("t3", df_events)
-
     # ── Stacked area: sector composition for one country ─────────────────────
     st.subheader("Sector Composition Over Time")
 
@@ -911,8 +918,8 @@ with tab3:
             margin=dict(l=50, r=30, t=60, b=50),
         )
 
-        if show_events_t3:
-            events_sub = df_events[df_events["Country"].isin(evt_cats_t3)]
+        if show_events:
+            events_sub = df_events[df_events["Country"].isin(evt_cats)]
             add_events_to_fig(fig_area, events_sub, [focus_country], year_range)
 
         st.plotly_chart(fig_area, use_container_width=True)
