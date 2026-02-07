@@ -721,6 +721,103 @@ with tab2:
 
     st.divider()
 
+    # ── Emissions Trajectory: Per Capita vs Total ────────────────────────────
+    st.subheader("Emissions Trajectory: Per Capita vs Total")
+    st.caption(
+        "Follow each country's path through emissions space over time. "
+        "The trajectory shows how total and per-capita emissions evolve together."
+    )
+
+    # Merge total and per-capita data for the selected countries and years
+    df_traj = pd.merge(
+        df_t_filtered[["Country", "Year", "CO2"]],
+        df_c_filtered[["Country", "Year", "CO2_per_capita"]],
+        on=["Country", "Year"], how="inner",
+    ).sort_values(["Country", "Year"])
+
+    if df_traj.empty:
+        st.info("No combined trajectory data for selected countries.")
+    else:
+        fig_traj = go.Figure()
+        
+        for idx, country in enumerate(selected_countries):
+            df_country = df_traj[df_traj["Country"] == country].sort_values("Year")
+            if df_country.empty:
+                continue
+            
+            color = CLIMATE_QUALITATIVE[idx % len(CLIMATE_QUALITATIVE)]
+            
+            # Add the trajectory line with markers
+            fig_traj.add_trace(go.Scatter(
+                x=df_country["CO2_per_capita"],
+                y=df_country["CO2"],
+                mode="lines+markers",
+                name=country,
+                line=dict(color=color, width=2),
+                marker=dict(size=6, color=color),
+                text=df_country["Year"],
+                hovertemplate=(
+                    f"<b>{country}</b><br>"
+                    "Year: %{text}<br>"
+                    "Per Capita: %{x:.2f} t/capita<br>"
+                    "Total: %{y:,.2f} Mt<extra></extra>"
+                ),
+            ))
+            
+            # Add start and end markers for clarity
+            if len(df_country) > 0:
+                # Start marker (earliest year)
+                start_row = df_country.iloc[0]
+                fig_traj.add_trace(go.Scatter(
+                    x=[start_row["CO2_per_capita"]],
+                    y=[start_row["CO2"]],
+                    mode="markers+text",
+                    marker=dict(size=12, color=color, symbol="circle", 
+                               line=dict(width=2, color="white")),
+                    text=[f"{start_row['Year']:.0f}"],
+                    textposition="top center",
+                    textfont=dict(size=9, color=color),
+                    showlegend=False,
+                    hoverinfo="skip",
+                ))
+                
+                # End marker (latest year)
+                end_row = df_country.iloc[-1]
+                fig_traj.add_trace(go.Scatter(
+                    x=[end_row["CO2_per_capita"]],
+                    y=[end_row["CO2"]],
+                    mode="markers+text",
+                    marker=dict(size=12, color=color, symbol="diamond",
+                               line=dict(width=2, color="white")),
+                    text=[f"{end_row['Year']:.0f}"],
+                    textposition="bottom center",
+                    textfont=dict(size=9, color=color),
+                    showlegend=False,
+                    hoverinfo="skip",
+                ))
+        
+        fig_traj.update_layout(
+            template=PLOTLY_TEMPLATE,
+            xaxis_title="Per Capita Emissions (tonnes CO2 / capita)",
+            yaxis_title="Total Emissions (Mt CO2)",
+            hovermode="closest",
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02,
+                xanchor="right", x=1,
+            ),
+            height=520,
+            margin=CHART_MARGIN,
+        )
+        
+        st.plotly_chart(fig_traj, use_container_width=True)
+        
+        st.caption(
+            "⚫ Circle = start year  ◆ Diamond = end year. "
+            "Arrows along the trajectory show the direction of time."
+        )
+
+    st.divider()
+
     # ── Cross-Correlation: GDP Growth vs CO2 Change ──────────────────────────
     st.subheader("Cross-Correlation: GDP Growth vs CO2 Change")
     st.caption(
