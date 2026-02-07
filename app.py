@@ -38,30 +38,21 @@ st.set_page_config(
 # Inject custom CSS to override Streamlit defaults with a climate-focused
 # colour scheme (dark teal headings, soft green sidebar, muted dividers).
 st.markdown("""
-<style>
-    /* Page background — light sage */
-    .main { background-color: #f0f4f3; }
+<style>    
+    /* Heading typography */
+    h1 { font-weight: 800 !important; letter-spacing: -0.5px; }
+    h2, h3 { font-weight: 700 !important; }
 
-    /* Heading hierarchy */
-    h1 { color: #1B5E4B !important; font-weight: 800 !important; letter-spacing: -0.5px; }
-    h2, h3 { color: #2E8B57 !important; font-weight: 700 !important; }
-
-    /* Metric cards — prominent values with upper-case labels */
+    /* Metric cards — bigger values, uppercase labels */
     [data-testid="stMetricValue"] {
         font-size: 28px !important;
         font-weight: 700 !important;
-        color: #1B5E4B !important;
     }
     [data-testid="stMetricLabel"] {
         font-size: 13px !important;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: #5a7d6e !important;
     }
-
-    /* Sidebar — pale green backdrop */
-    [data-testid="stSidebar"] { background-color: #e8f0ec; }
-    [data-testid="stSidebar"] h1 { font-size: 22px !important; color: #1B5E4B !important; }
 
     /* Tab strip — rounded tops, bold labels */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
@@ -71,8 +62,26 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Soft dividers */
-    hr { border-color: #c5d8cf !important; }
+    @media (prefers-color-scheme: light) {
+        
+        /* Page background — light sage */
+        .main { background-color: #f0f4f3; }
+
+        /* Heading Colors — Dark Teal */
+        h1 { color: #1B5E4B !important; }
+        h2, h3 { color: #2E8B57 !important; }
+
+        /* Metric Colors */
+        [data-testid="stMetricValue"] { color: #1B5E4B !important; }
+        [data-testid="stMetricLabel"] { color: #5a7d6e !important; }
+
+        /* Sidebar — pale green backdrop */
+        [data-testid="stSidebar"] { background-color: #e8f0ec; }
+        [data-testid="stSidebar"] h1 { color: #1B5E4B !important; }
+
+        /* Soft dividers */
+        hr { border-color: #c5d8cf !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
