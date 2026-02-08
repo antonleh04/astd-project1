@@ -26,11 +26,11 @@ def render_tab2_charts(
     evt_iso_codes: list[str],
 ):
     """Render all charts for Tab 2 (Equity & Economy)."""
-    
+
     # ── Emissions Trajectory: Per Capita vs Total ────────────────────────────
     st.subheader("Emissions Trajectory: Per Capita vs Total")
     st.caption(
-        "Follow each country's path through emissions space over time. "
+        "Press ▶ Play to watch each country's path through emissions space over time. "
         "The trajectory shows how total and per-capita emissions evolve together."
     )
 
@@ -44,84 +44,212 @@ def render_tab2_charts(
     if df_traj.empty:
         st.info("No combined trajectory data for selected countries.")
     else:
-        fig_traj = go.Figure()
-        
+        # ── Build animated trajectory ──
+        # Collect per-country data
+        country_data = {}
         for idx, iso_code in enumerate(selected_iso_codes):
             df_country = df_traj[df_traj["ISOcode"] == iso_code].sort_values("Year")
             if df_country.empty:
                 continue
-            
             country_name = df_country["Country"].iloc[0]
             color = CLIMATE_QUALITATIVE[idx % len(CLIMATE_QUALITATIVE)]
-            
-            # Add the trajectory line with markers
-            fig_traj.add_trace(go.Scatter(
-                x=df_country["CO2_per_capita"],
-                y=df_country["CO2"],
-                mode="lines+markers",
-                name=country_name,
-                line=dict(color=color, width=2),
-                marker=dict(size=6, color=color),
-                text=df_country["Year"],
-                hovertemplate=(
-                    f"<b>{country_name}</b><br>"
-                    "Year: %{text}<br>"
-                    "Per Capita: %{x:.2f} t/capita<br>"
-                    "Total: %{y:,.2f} Mt<extra></extra>"
-                ),
-            ))
-            
-            # Add start and end markers for clarity
-            if len(df_country) > 0:
-                # Start marker (earliest year)
-                start_row = df_country.iloc[0]
+            country_data[iso_code] = {
+                "name": country_name,
+                "color": color,
+                "df": df_country.reset_index(drop=True),
+            }
+
+        if not country_data:
+            st.info("No trajectory data available for the selected countries.")
+        else:
+            # Determine the union of all years across selected countries
+            all_years = sorted(df_traj["Year"].unique())
+
+            # ── Base figure: empty traces (one line + one head-marker per country) ──
+            fig_traj = go.Figure()
+            for iso_code, cdata in country_data.items():
+                # Trajectory line (starts empty)
                 fig_traj.add_trace(go.Scatter(
-                    x=[start_row["CO2_per_capita"]],
-                    y=[start_row["CO2"]],
+                    x=[], y=[],
+                    mode="lines+markers",
+                    name=cdata["name"],
+                    line=dict(color=cdata["color"], width=2),
+                    marker=dict(size=5, color=cdata["color"]),
+                    hovertemplate=(
+                        f"<b>{cdata['name']}</b><br>"
+                        "Year: %{text}<br>"
+                        "Per Capita: %{x:.2f} t/capita<br>"
+                        "Total: %{y:,.2f} Mt<extra></extra>"
+                    ),
+                ))
+                # Moving head marker (current year dot)
+                fig_traj.add_trace(go.Scatter(
+                    x=[], y=[],
                     mode="markers+text",
-                    marker=dict(size=12, color=color, symbol="circle", 
-                               line=dict(width=2, color="white")),
-                    text=[f"{start_row['Year']:.0f}"],
+                    marker=dict(size=14, color=cdata["color"], symbol="diamond",
+                                line=dict(width=2, color="white")),
                     textposition="top center",
-                    textfont=dict(size=9, color=color),
+                    textfont=dict(size=10, color=cdata["color"]),
                     showlegend=False,
                     hoverinfo="skip",
                 ))
-                
-                # End marker (latest year)
-                end_row = df_country.iloc[-1]
-                fig_traj.add_trace(go.Scatter(
-                    x=[end_row["CO2_per_capita"]],
-                    y=[end_row["CO2"]],
-                    mode="markers+text",
-                    marker=dict(size=12, color=color, symbol="diamond",
-                               line=dict(width=2, color="white")),
-                    text=[f"{end_row['Year']:.0f}"],
-                    textposition="bottom center",
-                    textfont=dict(size=9, color=color),
-                    showlegend=False,
-                    hoverinfo="skip",
+
+            # ── Build frames: each frame shows data up to that year ──
+            frames = []
+            for yi, year in enumerate(all_years):
+                frame_data = []
+                for iso_code, cdata in country_data.items():
+                    df_c = cdata["df"]
+                    df_up_to = df_c[df_c["Year"] <= year]
+
+                    # Line trace (cumulative)
+                    frame_data.append(go.Scatter(
+                        x=df_up_to["CO2_per_capita"],
+                        y=df_up_to["CO2"],
+                        mode="lines+markers",
+                        line=dict(color=cdata["color"], width=2),
+                        marker=dict(size=5, color=cdata["color"]),
+                        text=df_up_to["Year"],
+                    ))
+
+                    # Head marker (only the latest point up to this year)
+                    if not df_up_to.empty:
+                        last = df_up_to.iloc[-1]
+                        frame_data.append(go.Scatter(
+                            x=[last["CO2_per_capita"]],
+                            y=[last["CO2"]],
+                            mode="markers+text",
+                            marker=dict(size=14, color=cdata["color"],
+                                        symbol="diamond",
+                                        line=dict(width=2, color="white")),
+                            text=[f"{int(last['Year'])}"],
+                            textposition="top center",
+                            textfont=dict(size=10, color=cdata["color"]),
+                        ))
+                    else:
+                        frame_data.append(go.Scatter(x=[], y=[]))
+
+                frames.append(go.Frame(
+                    data=frame_data,
+                    name=str(int(year)),
                 ))
-        
-        fig_traj.update_layout(
-            template=PLOTLY_TEMPLATE,
-            xaxis_title="Per Capita Emissions (tonnes CO2 / capita)",
-            yaxis_title="Total Emissions (Mt CO2)",
-            hovermode="closest",
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02,
-                xanchor="right", x=1,
-            ),
-            height=520,
-            margin=CHART_MARGIN,
-        )
-        
-        st.plotly_chart(fig_traj, use_container_width=True)
-        
-        st.caption(
-            "⚫ Circle = start year  ◆ Diamond = end year. "
-            "Arrows along the trajectory show the direction of time."
-        )
+
+            fig_traj.frames = frames
+
+            # ── Axis ranges (fixed so the view doesn't jump) ──
+            x_min = df_traj["CO2_per_capita"].min()
+            x_max = df_traj["CO2_per_capita"].max()
+            y_min = df_traj["CO2"].min()
+            y_max = df_traj["CO2"].max()
+            x_pad = (x_max - x_min) * 0.08 or 1
+            y_pad = (y_max - y_min) * 0.08 or 1
+
+            # ── Determine sensible animation speed ──
+            n_years = len(all_years)
+            frame_dur = max(40, min(300, int(10_000 / max(n_years, 1))))
+
+            # ── Layout with Play / Pause / Slider ──
+            fig_traj.update_layout(
+                template=PLOTLY_TEMPLATE,
+                xaxis=dict(
+                    title="Per Capita Emissions (tonnes CO2 / capita)",
+                    range=[x_min - x_pad, x_max + x_pad],
+                    # Add standoff to ensure title doesn't hit buttons
+                    title_standoff=20
+                ),
+                yaxis=dict(
+                    title="Total Emissions (Mt CO2)",
+                    range=[y_min - y_pad, y_max + y_pad],
+                ),
+                hovermode="closest",
+                legend=dict(
+                    orientation="h", yanchor="bottom", y=1.02,
+                    xanchor="right", x=1,
+                ),
+                height=600, # Increased height to accommodate the controls
+                # Override margin to give generous space at bottom for slider
+                margin=dict(l=50, r=50, t=50, b=130),
+                updatemenus=[dict(
+                    type="buttons",
+                    showactive=False,
+                    # Position buttons below the chart area (y < 0)
+                    x=0.0, y=-0.25,
+                    xanchor="left", yanchor="top",
+                    pad={"r": 10, "t": 10},
+                    buttons=[
+                        dict(
+                            label="▶ Play",
+                            method="animate",
+                            args=[
+                                None,
+                                dict(
+                                    frame=dict(duration=frame_dur, redraw=True),
+                                    fromcurrent=True,
+                                    transition=dict(duration=frame_dur // 2,
+                                                    easing="cubic-in-out"),
+                                    mode="immediate",
+                                ),
+                            ],
+                        ),
+                        dict(
+                            label="⏸ Pause",
+                            method="animate",
+                            args=[
+                                [None],
+                                dict(
+                                    frame=dict(duration=0, redraw=False),
+                                    mode="immediate",
+                                ),
+                            ],
+                        ),
+                    ],
+                )],
+                sliders=[dict(
+                    active=0,
+                    steps=[
+                        dict(
+                            args=[
+                                [str(int(year))],
+                                dict(
+                                    frame=dict(duration=frame_dur, redraw=True),
+                                    mode="immediate",
+                                    transition=dict(duration=frame_dur // 2),
+                                ),
+                            ],
+                            label=str(int(year)),
+                            method="animate",
+                        )
+                        for year in all_years
+                    ],
+                    # Position slider next to buttons, also below chart
+                    x=0.15, len=0.85,
+                    xanchor="left",
+                    y=-0.25, yanchor="top",
+                    pad={"t": 0, "b": 10},
+                    currentvalue=dict(
+                        prefix="Year: ",
+                        visible=True,
+                        xanchor="center",
+                    ),
+                    transition=dict(duration=frame_dur // 2,
+                                    easing="cubic-in-out"),
+                )],
+            )
+
+            # Updated st.plotly_chart with config to fix modebar issues
+            st.plotly_chart(
+                fig_traj, 
+                use_container_width=True,
+                config={
+                    'displayModeBar': False,  # Hide standard Plotly toolbar to prevent interaction bugs
+                    'responsive': True        # Ensure chart adapts well to container resizing
+                }
+            )
+
+            st.caption(
+                "◆ Diamond marker follows the latest data point for each country. "
+                "Use the slider to scrub to a specific year."
+            )
 
     st.divider()
 
@@ -170,7 +298,7 @@ def render_tab2_charts(
     if len(merged_ccf) < 10:
         st.warning(
             f"Insufficient data for **{analysis_country_name}** "
-            "(need \u2265 10 overlapping years)."
+            "(need ≥ 10 overlapping years)."
         )
     else:
         # -- Dual-axis time-series overlay --
