@@ -154,7 +154,6 @@ def render_tab2_charts(
                 xaxis=dict(
                     title="Per Capita Emissions (tonnes CO2 / capita)",
                     range=[x_min - x_pad, x_max + x_pad],
-                    # Add standoff to ensure title doesn't hit buttons
                     title_standoff=20
                 ),
                 yaxis=dict(
@@ -166,13 +165,11 @@ def render_tab2_charts(
                     orientation="h", yanchor="bottom", y=1.02,
                     xanchor="right", x=1,
                 ),
-                height=600, # Increased height to accommodate the controls
-                # Override margin to give generous space at bottom for slider
+                height=600, 
                 margin=dict(l=50, r=50, t=50, b=130),
                 updatemenus=[dict(
                     type="buttons",
                     showactive=False,
-                    # Position buttons below the chart area (y < 0)
                     x=0.0, y=-0.25,
                     xanchor="left", yanchor="top",
                     pad={"r": 10, "t": 10},
@@ -221,7 +218,6 @@ def render_tab2_charts(
                         )
                         for year in all_years
                     ],
-                    # Position slider next to buttons, also below chart
                     x=0.15, len=0.85,
                     xanchor="left",
                     y=-0.25, yanchor="top",
@@ -236,13 +232,12 @@ def render_tab2_charts(
                 )],
             )
 
-            # Updated st.plotly_chart with config to fix modebar issues
             st.plotly_chart(
                 fig_traj, 
                 use_container_width=True,
                 config={
-                    'displayModeBar': False,  # Hide standard Plotly toolbar to prevent interaction bugs
-                    'responsive': True        # Ensure chart adapts well to container resizing
+                    'displayModeBar': False,
+                    'responsive': True
                 }
             )
 
@@ -251,13 +246,20 @@ def render_tab2_charts(
                 "Use the slider to scrub to a specific year."
             )
 
+            st.info("""
+                * **Vertical Move (↑/↓):** Change in **scale**. The country is emitting more (or less) in total, often tied to population growth or industrial expansion.
+                * **Horizontal Move (→/←):** Change in **efficiency/lifestyle**. Moving left indicates 'decoupling'—reducing the carbon footprint per person even if the economy stays the same.
+                * **Diagonal Up-Right (↗):** High-carbon growth. Both total and per-capita emissions are rising.
+                * **Diagonal Down-Left (↙):** Deep decarbonization. The country is shrinking its total footprint and its per-capita intensity simultaneously.
+                """)
+
     st.divider()
 
     # ── Cross-Correlation: GDP Growth vs CO2 Change ──────────────────────────
     st.subheader("Cross-Correlation: GDP Growth vs CO2 Change")
     st.caption(
         "Analyse the temporal relationship between economic growth and emissions "
-        "changes.  Negative lags mean GDP *leads* CO2; positive lags mean CO2 "
+        "changes. Negative lags mean GDP *leads* CO2; positive lags mean CO2 "
         "changes *precede* GDP."
     )
 
@@ -265,7 +267,6 @@ def render_tab2_charts(
     if len(selected_iso_codes) == 1:
         analysis_iso = selected_iso_codes[0]
     else:
-        # Create a mapping for display
         iso_to_name = df_totals[["ISOcode", "Country"]].drop_duplicates().set_index("ISOcode")["Country"].to_dict()
         analysis_iso = st.selectbox(
             "Select Country for Analysis",
@@ -341,86 +342,98 @@ def render_tab2_charts(
 
         st.plotly_chart(fig_ts, use_container_width=True)
 
-        # -- CCF lollipop chart --
-        max_possible_lag = min(10, len(merged_ccf) // 3)
-        max_lag = st.slider(
-            "Max Lag (years)", 1, max_possible_lag,
-            min(5, max_possible_lag), key="ccf_lag",
-        )
+        # -- CCF lollipop chart (Static lag range) --
+        # We target a max lag of 10 years, but ensure we don't exceed 1/3 of the data length
+        target_lag = 10
+        limit_by_data = len(merged_ccf) // 3
+        max_lag = min(target_lag, limit_by_data)
 
-        gdp_series = merged_ccf["GDP Growth (annual %)"].values
-        co2_series = merged_ccf["CO2_YoY_Change"].values
+        if max_lag < 1:
+            st.info("Data series too short for lag analysis.")
+        else:
+            gdp_series = merged_ccf["GDP Growth (annual %)"].values
+            co2_series = merged_ccf["CO2_YoY_Change"].values
 
-        try:
-            ccf_pos = ccf(co2_series, gdp_series, adjusted=False)
+            try:
+                # Calculate CCF (numpy implementation usually returns [0...2*n-1] or [0...lag])
+                # Statsmodels ccf returns forward correlations. We construct lags manually.
+                ccf_pos = ccf(co2_series, gdp_series, adjusted=False)
+                ccf_neg = ccf(gdp_series, co2_series, adjusted=False) # Swapped for negative lags
 
-            # Build symmetric lag array [-max_lag ... +max_lag]
-            lags = np.arange(-max_lag, max_lag + 1)
-            ccf_subset: list[float] = []
-            for lag in lags:
-                if lag < 0:
-                    # Negative lag: swap the series order
-                    ccf_subset.append(
-                        ccf(gdp_series, co2_series, adjusted=False)[abs(lag)]
+                # Build symmetric lag array [-max_lag ... +max_lag]
+                lags = np.arange(-max_lag, max_lag + 1)
+                ccf_subset = []
+                
+                for lag in lags:
+                    if lag < 0:
+                        ccf_subset.append(ccf_neg[abs(lag)])
+                    else:
+                        ccf_subset.append(ccf_pos[lag])
+
+                # Draw stem (stick) for each lag value
+                fig_ccf = go.Figure()
+                
+                # Draw the vertical lines (stems)
+                for lag_v, corr_v in zip(lags, ccf_subset):
+                    fig_ccf.add_trace(go.Scatter(
+                        x=[lag_v, lag_v], y=[0, corr_v],
+                        mode="lines",
+                        line=dict(color=COLORS["stem_line"], width=2),
+                        showlegend=False, hoverinfo="skip",
+                    ))
+
+                # Coloured markers on top of each stem
+                colors_ccf = [
+                    COLORS["negative"] if c < 0 else COLORS["positive"] for c in ccf_subset
+                ]
+                fig_ccf.add_trace(go.Scatter(
+                    x=lags, y=ccf_subset, mode="markers",
+                    marker=dict(
+                        size=12, color=colors_ccf,
+                        line=dict(width=1, color="white"),
+                    ),
+                    name="Correlation",
+                    hovertemplate="<b>Lag %{x} yr</b><br>r = %{y:.3f}<extra></extra>",
+                ))
+                
+                fig_ccf.add_hline(
+                    y=0, line_dash="dash", line_color=COLORS["zero_line"], line_width=1,
+                )
+                
+                fig_ccf.update_layout(
+                    template=PLOTLY_TEMPLATE, height=420, showlegend=False,
+                    xaxis=dict(
+                        title="Lag (years)", 
+                        tickmode="linear", 
+                        dtick=1,
+                        range=[-max_lag - 0.5, max_lag + 0.5]
+                    ),
+                    yaxis_title="Correlation Coefficient",
+                    margin=CHART_MARGIN,
+                )
+                st.plotly_chart(fig_ccf, use_container_width=True)
+
+                # Interpret the peak automatically
+                peak_idx = int(np.argmax(np.abs(ccf_subset)))
+                peak_lag = int(lags[peak_idx])
+                peak_corr = ccf_subset[peak_idx]
+
+                if peak_lag == 0:
+                    interp = (
+                        f"**Peak at Lag 0** (r = {peak_corr:.3f}): "
+                        "GDP and CO2 changes are **synchronous**."
+                    )
+                elif peak_lag < 0:
+                    interp = (
+                        f"**Peak at Lag {peak_lag}** (r = {peak_corr:.3f}): "
+                        f"GDP growth **leads** CO2 by {abs(peak_lag)} year(s)."
                     )
                 else:
-                    ccf_subset.append(ccf_pos[lag])
+                    interp = (
+                        f"**Peak at Lag +{peak_lag}** (r = {peak_corr:.3f}): "
+                        f"CO2 changes **lead** GDP by {peak_lag} year(s)."
+                    )
+                st.info(interp)
 
-            # Draw stem (stick) for each lag value
-            fig_ccf = go.Figure()
-            for lag_v, corr_v in zip(lags, ccf_subset):
-                fig_ccf.add_trace(go.Scatter(
-                    x=[lag_v, lag_v], y=[0, corr_v],
-                    mode="lines",
-                    line=dict(color=COLORS["stem_line"], width=2),
-                    showlegend=False, hoverinfo="skip",
-                ))
-
-            # Coloured markers on top of each stem
-            colors_ccf = [
-                COLORS["negative"] if c < 0 else COLORS["positive"] for c in ccf_subset
-            ]
-            fig_ccf.add_trace(go.Scatter(
-                x=lags, y=ccf_subset, mode="markers",
-                marker=dict(
-                    size=12, color=colors_ccf,
-                    line=dict(width=1, color="white"),
-                ),
-                name="Correlation",
-                hovertemplate="<b>Lag %{x} yr</b><br>r = %{y:.3f}<extra></extra>",
-            ))
-            fig_ccf.add_hline(
-                y=0, line_dash="dash", line_color=COLORS["zero_line"], line_width=1,
-            )
-            fig_ccf.update_layout(
-                template=PLOTLY_TEMPLATE, height=420, showlegend=False,
-                xaxis=dict(title="Lag (years)", tickmode="linear", dtick=1),
-                yaxis_title="Correlation Coefficient",
-                margin=CHART_MARGIN,
-            )
-            st.plotly_chart(fig_ccf, use_container_width=True)
-
-            # Interpret the peak automatically
-            peak_idx  = int(np.argmax(np.abs(ccf_subset)))
-            peak_lag  = int(lags[peak_idx])
-            peak_corr = ccf_subset[peak_idx]
-
-            if peak_lag == 0:
-                interp = (
-                    f"**Peak at Lag 0** (r = {peak_corr:.3f}): "
-                    "GDP and CO2 changes are **synchronous**."
-                )
-            elif peak_lag < 0:
-                interp = (
-                    f"**Peak at Lag {peak_lag}** (r = {peak_corr:.3f}): "
-                    f"GDP growth **leads** CO2 by {abs(peak_lag)} year(s)."
-                )
-            else:
-                interp = (
-                    f"**Peak at Lag +{peak_lag}** (r = {peak_corr:.3f}): "
-                    f"CO2 changes **lead** GDP by {peak_lag} year(s)."
-                )
-            st.info(interp)
-
-        except Exception as e:
-            st.error(f"Cross-correlation error: {e}")
+            except Exception as e:
+                st.error(f"Cross-correlation error: {e}")
