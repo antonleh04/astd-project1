@@ -111,13 +111,10 @@ def render_tab1_charts(
 
     st.divider()
 
-    # ── Treemap: Emissions sized, Per Capita coloured ──────────────────────
+    # ── Treemap: Emissions Hierarchy ─────────────────────────────────────────
     st.subheader(f"Global Emissions Hierarchy ({latest_year})")
-    st.caption(
-        "Each rectangle is **proportional to Total Emissions**. "
-        "The colour intensity shows **Emissions Per Capita** (Red = High Intensity)."
-    )
-
+    
+    # Prepare data first
     df_co2_latest = df_t_filtered[df_t_filtered["Year"] == latest_year]
     df_capita_latest = df_c_filtered[
         (df_c_filtered["Year"] == latest_year)
@@ -130,6 +127,33 @@ def render_tab1_charts(
         on="ISOcode", how="inner",
     ).dropna(subset=["CO2", "CO2_per_capita"])
 
+    # Toggle for sizing strategy
+    tm_col1, tm_col2 = st.columns([1, 2])
+    with tm_col1:
+        size_mode = st.radio(
+            "Size Rectangles By:",
+            ["Total Emissions (Physical)", "Log Scale (Compromise)"],
+            horizontal=False,
+            help=(
+                "Physical: True scale (China is 1000x Luxembourg).\n"
+                "Log Scale: Compresses size differences so small countries are visible."
+            )
+        )
+
+    if not df_tree.empty:
+        # Add log column (use shift+1 to handle <1 Mt values safely)
+        df_tree["CO2_log"] = np.log10(df_tree["CO2"].clip(lower=0.1) + 1)
+    
+    if size_mode == "Total Emissions (Physical)":
+        size_col = "CO2"
+    else:
+        size_col = "CO2_log"
+    
+    st.caption(
+        f"Each rectangle is proportional to **{size_mode}**. "
+        "The colour intensity shows **Emissions Per Capita** (Red = High Intensity)."
+    )
+
     if df_tree.empty:
         st.info("No matching data for the selected countries / year.")
     else:
@@ -141,11 +165,10 @@ def render_tab1_charts(
             CLIMATE_QUALITATIVE[1]
         ]
         
-        # Create descriptive hover text
         fig_treemap = px.treemap(
             df_tree,
             path=["Country"],
-            values="CO2",
+            values=size_col,
             color="CO2_per_capita",
             color_continuous_scale=custom_scale,
             hover_data={"CO2": ":.1f", "CO2_per_capita": ":.2f"},
@@ -156,7 +179,6 @@ def render_tab1_charts(
         )
         
         # Center the color scale roughly around global sustainable targets or average
-        # Global Avg is ~4.7t. We set a midpoint to make the "Green vs Red" distinction clearer.
         fig_treemap.update_coloraxes(
             cmin=0,
             cmid=df_tree["CO2_per_capita"].median(), 
