@@ -4,10 +4,12 @@ Tab 3 Charts: Sectoral Deep Dive
 Visualizations for sector composition and fingerprints.
 """
 
+import math
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from config import CLIMATE_QUALITATIVE, PLOTLY_TEMPLATE
 from utils import add_events_to_fig
@@ -23,69 +25,166 @@ def render_tab3_charts(
     evt_iso_codes: list[str],
 ):
     """Render all charts for Tab 3 (Sectoral Deep Dive)."""
-    
-    # ── Stacked area: sector composition for one country ─────────────────────
+
+    # ── Stacked area: sector composition for selected countries ──────────────
     st.subheader("Sector Composition Over Time")
+    
+    # Toggle for chart mode
+    chart_mode = st.radio(
+        "Chart Mode",
+        ["Normalized (100%)", "Absolute Growth"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    is_normalized = chart_mode == "Normalized (100%)"
 
-    if len(selected_iso_codes) == 1:
-        focus_iso = selected_iso_codes[0]
-    else:
-        # Create a mapping for display
-        iso_to_name = df_s_filtered[["ISOcode", "Country"]].drop_duplicates().set_index("ISOcode")["Country"].to_dict()
-        focus_iso = st.selectbox(
-            "Focus country for stacked area chart",
-            selected_iso_codes,
-            format_func=lambda iso: iso_to_name.get(iso, iso),
-            key="sector_focus",
+    if not selected_iso_codes:
+        st.info("Please select at least one country.")
+        return
+
+    # Determine grid dimensions
+    n_charts = len(selected_iso_codes)
+    cols = 3
+    rows = math.ceil(n_charts / cols)
+    
+    # Dynamic styling calculations
+    row_height = 300
+    vertical_gap_px = 50
+    total_height = row_height * rows + 100  # +100 for legend/margin
+    
+    # Calculate vertical spacing as fraction of plot area
+    # Guard against rows=1 where spacing doesn't matter but division by zero could occur if logic changes
+    vertical_spacing = (vertical_gap_px / (row_height * rows)) if rows > 1 else 0.1
+
+    # Create the subplot grid
+    fig = make_subplots(
+        rows=rows, 
+        cols=cols, 
+        subplot_titles=[
+            df_s_filtered[df_s_filtered["ISOcode"] == iso]["Country"].iloc[0] 
+            if not df_s_filtered[df_s_filtered["ISOcode"] == iso].empty else iso 
+            for iso in selected_iso_codes
+        ],
+        vertical_spacing=vertical_spacing,
+        horizontal_spacing=0.05,
+        shared_xaxes=True,
+        shared_yaxes=is_normalized, # Share Y-axis only if normalized (0-100%)
+    )
+
+    # Get unique sectors from the entire filtered dataset for consistent coloring
+    all_sectors = sorted(df_s_filtered["Sector"].unique())
+    # Create a mapping of sector to color
+    sector_colors = {
+        sec: CLIMATE_QUALITATIVE[i % len(CLIMATE_QUALITATIVE)] 
+        for i, sec in enumerate(all_sectors)
+    }
+
+    # Track which sectors we've added to the legend to avoid duplicates
+    sectors_in_legend = set()
+
+    for i, iso in enumerate(selected_iso_codes):
+        row = (i // cols) + 1
+        col = (i % cols) + 1
+        
+        df_country = df_s_filtered[df_s_filtered["ISOcode"] == iso]
+        
+        if df_country.empty:
+            continue
+            
+        # Group by Year and Sector to get totals
+        sector_ts = df_country.groupby(["Year", "Sector"])["CO2"].sum().reset_index()
+        
+        # ── Densify data: Ensure all sectors exist for all years ─────────────────
+        # This prevents stacking artifacts if a sector is missing in some years
+        unique_years = sector_ts["Year"].unique()
+        
+        # Create a MultiIndex of all possible (Year, Sector) pairs
+        full_idx = pd.MultiIndex.from_product(
+            [unique_years, all_sectors], 
+            names=["Year", "Sector"]
         )
-
-    df_focus = df_s_filtered[df_s_filtered["ISOcode"] == focus_iso]
-    focus_country = df_focus["Country"].iloc[0] if not df_focus.empty else focus_iso
-
-    if df_focus.empty:
-        st.info(f"No sector data for **{focus_country}** in this range.")
-    else:
-        sector_ts = df_focus.groupby(["Year", "Sector"])["CO2"].sum().reset_index()
-        fig_area = go.Figure()
-        sectors = sorted(sector_ts["Sector"].unique())
-        for idx, sec in enumerate(sectors):
+        
+        # Reindex and fill missing CO2 with 0
+        sector_ts = (
+            sector_ts.set_index(["Year", "Sector"])
+            .reindex(full_idx, fill_value=0)
+            .reset_index()
+        )
+        
+        if is_normalized:
+            # Calculate yearly totals to normalize
+            yearly_totals = sector_ts.groupby("Year")["CO2"].transform("sum")
+            
+            # Avoid division by zero
+            sector_ts["Value"] = sector_ts.apply(
+                lambda x: (x["CO2"] / yearly_totals[x.name] * 100) if yearly_totals[x.name] > 0 else 0, 
+                axis=1
+            )
+            y_hover_fmt = ".1f"
+            y_hover_suffix = "%"
+        else:
+            # Use absolute values
+            sector_ts["Value"] = sector_ts["CO2"]
+            y_hover_fmt = ",.2f"
+            y_hover_suffix = " Mt"
+        
+        # Sort to ensure proper stacking order
+        for sec in all_sectors:
             df_sec = sector_ts[sector_ts["Sector"] == sec].sort_values("Year")
-            color = CLIMATE_QUALITATIVE[idx % len(CLIMATE_QUALITATIVE)]
-            fig_area.add_trace(go.Scatter(
-                x=df_sec["Year"], y=df_sec["CO2"],
-                mode="lines", name=sec, stackgroup="one",
-                line=dict(width=0.5, color=color),
-                hovertemplate=(
-                    f"<b>{sec}</b><br>"
-                    "Year: %{x}<br>"
-                    "CO2: %{y:,.2f} Mt<extra></extra>"
+            
+            show_legend = sec not in sectors_in_legend
+            if show_legend:
+                sectors_in_legend.add(sec)
+            
+            fig.add_trace(
+                go.Scatter(
+                    x=df_sec["Year"], 
+                    y=df_sec["Value"],
+                    mode="lines", 
+                    name=sec, 
+                    stackgroup="one",
+                    line=dict(width=0.5, color=sector_colors[sec]),
+                    fillcolor=sector_colors[sec],
+                    opacity=1,
+                    showlegend=show_legend,
+                    hovertemplate=(
+                        f"<b>{sec}</b><br>"
+                        "Year: %{x}<br>"
+                        f"Value: %{{y:{y_hover_fmt}}}{y_hover_suffix}<br>"
+                        "CO2: %{customdata:,.2f} Mt<extra></extra>"
+                    ),
+                    customdata=df_sec["CO2"] # Pass absolute values for hover
                 ),
-            ))
-        fig_area.update_layout(
-            template=PLOTLY_TEMPLATE,
-            title=f"Sectoral Emissions \u2014 {focus_country}",
-            xaxis_title="Year",
-            yaxis_title="CO2 Emissions (Mt)",
-            hovermode="x unified",
-            height=460,
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02,
-                xanchor="right", x=1,
-            ),
-            margin=dict(l=50, r=30, t=60, b=50),
-        )
+                row=row, 
+                col=col
+            )
 
-        if show_events:
-            events_sub = df_events[df_events["ISOcode"].isin(evt_iso_codes)]
-            add_events_to_fig(fig_area, events_sub, [focus_iso], year_range)
-
-        st.plotly_chart(fig_area, use_container_width=True)
+    # Update layout
+    fig.update_layout(
+        template=PLOTLY_TEMPLATE,
+        height=total_height, # Use calculated total height
+        hovermode="x unified",
+        legend=dict(
+            orientation="h", 
+            yanchor="top", y=-0.1 / (rows * 0.3) if rows > 3 else -0.15, # Adjust legend position slightly based on rows
+            xanchor="center", x=0.5
+        ),
+        margin=dict(l=50, r=30, t=60, b=100),
+    )
+    
+    # Update y-axes
+    y_title = "Share of Emissions (%)" if is_normalized else "CO2 Emissions (Mt)"
+    y_range = [0, 100] if is_normalized else None
+    
+    fig.update_yaxes(title=y_title if cols == 1 else None, range=y_range)
+    
+    st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
 
     # ── Sectoral Fingerprint Treemap ─────────────────────────────────────────
     st.subheader(f"Sectoral Fingerprint ({latest_year})")
-    st.markdown("##### Sector Breakdown Treemap")
+    # st.markdown("##### Sector Breakdown Treemap")
     if not df_s_filtered.empty:
         df_sec_tree = df_s_filtered[df_s_filtered["Year"] == latest_year]
         if not df_sec_tree.empty:
