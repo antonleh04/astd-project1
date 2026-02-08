@@ -1,313 +1,198 @@
+"""
+CO2 Emissions Analysis Dashboard
+=================================
+A Streamlit-based interactive dashboard for exploring global fossil-fuel CO2
+emissions across countries, economic indicators, and industry sectors.
+
+Data sources:
+  - CO2 totals / per-capita / by sector (EDGARv8.0 via JRC)
+  - GDP growth (World Bank API)
+  - Land area (World Bank API)
+  - Notable climate & economic events (curated CSV)
+
+Layout:
+  Tab 1 – The Big Picture    → aggregate trends, KPIs, treemap
+  Tab 2 – Equity & Economy   → trajectory, cross-correlation
+  Tab 3 – Sectoral Deep Dive → stacked area, sector treemap
+"""
+
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 
-#region config
-st.set_page_config(page_title="ALLSTAT CO2 Prototype", layout="wide")
+from config import COUNTRY_PRESETS, CUSTOM_CSS
+from data_loader import (
+    load_co2_data,
+    load_events_data,
+    load_gdp_data,
+)
+from visualizations import render_tab1_charts, render_tab2_charts, render_tab3_charts
 
-# Custom CSS for aesthetics
-st.markdown("""
-    <style>
-    [data-testid="stMetricValue"] { font-size: 24px; }
-    .main { background-color: #f5f7f9; }
-    </style>
-    """, unsafe_allow_html=True)
 
-#region data
-@st.cache_data
-def load_events_data(file_path):
-    df_events = pd.read_csv(file_path)
-    df_events['Year'] = pd.to_numeric(df_events['Year'], errors='coerce')
-    df_events.dropna(subset=['Year'], inplace=True)
-    df_events['Year'] = df_events['Year'].astype(int)
-    return df_events
+st.set_page_config(
+    page_title="ALLSTAT CO2 Dashboard",
+    layout="wide",
+)
 
-@st.cache_data
-def load_data(file_path):
-    xlsx = pd.ExcelFile(file_path)
-    
-    # Process Total Emissions
-    df_totals = xlsx.parse('fossil_CO2_totals_by_country').melt(
-        id_vars=['ISOcode', 'Country'], var_name='Year', value_name='CO2'
-    )
-    
-    # Process Per Capita
-    df_capita = xlsx.parse('fossil_CO2_per_capita_by_countr').melt(
-        id_vars=['ISOcode', 'Country'], var_name='Year', value_name='CO2_per_capita'
-    )
-    
-    # Process Sector Data
-    df_sector = xlsx.parse('fossil_CO2_by_sector_and_countr').melt(
-        id_vars=['Sector', 'ISOcode', 'Country'], var_name='Year', value_name='CO2'
-    )
-    
-    for df in [df_totals, df_capita, df_sector]:
-        df['Year'] = pd.to_numeric(df['Year'], errors='coerce')
-        df.dropna(subset=['Year'], inplace=True)
-        df['Year'] = df['Year'].astype(int)
-        
-    return df_totals, df_capita, df_sector
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-def add_events_to_fig(fig, events, selected_countries, year_range):
-    events_in_range = events[
-        (events['Year'].between(*year_range)) & 
-        (events['Country'].isin(selected_countries + ['Global']))
-    ]
-    for _, event in events_in_range.iterrows():
-        fig.add_vline(
-            x=event['Year'], 
-            line_width=1, 
-            line_dash="dash", 
-            line_color="grey",
-            annotation_text=event['Event'],
-            annotation_position="top left",
-            annotation_font_size=10,
-            annotation_hovertext=f"<b>{event['Event']} ({event['Year']})</b><br>{event['Description']}"
-        )
 
-@st.cache_data
-def load_land_area_data(file_path):
-    df_land_area = pd.read_csv(file_path, skiprows=4)
-    df_land_area = df_land_area.melt(
-        id_vars=['Country Name', 'Country Code', 'Indicator Name', 'Indicator Code'],
-        var_name='Year',
-        value_name='Land area (sq. km)'
-    )
-    df_land_area['Year'] = pd.to_numeric(df_land_area['Year'], errors='coerce')
-    df_land_area.dropna(subset=['Year'], inplace=True)
-    df_land_area['Year'] = df_land_area['Year'].astype(int)
-    df_land_area.rename(columns={'Country Name': 'Country'}, inplace=True)
-    df_land_area['Land area (sq. km)'] = pd.to_numeric(df_land_area['Land area (sq. km)'], errors='coerce')
-    return df_land_area
-
-@st.cache_data
-def load_gdp_data(file_path):
-    df_gdp = pd.read_csv(file_path, skiprows=4)
-    df_gdp = df_gdp.melt(
-        id_vars=['Country Name', 'Country Code', 'Indicator Name', 'Indicator Code'],
-        var_name='Year',
-        value_name='GDP Growth (annual %)'
-    )
-    df_gdp['Year'] = pd.to_numeric(df_gdp['Year'], errors='coerce')
-    df_gdp.dropna(subset=['Year'], inplace=True)
-    df_gdp['Year'] = df_gdp['Year'].astype(int)
-    df_gdp.rename(columns={'Country Name': 'Country'}, inplace=True)
-    df_gdp['GDP Growth (annual %)'] = pd.to_numeric(df_gdp['GDP Growth (annual %)'], errors='coerce')
-    return df_gdp
-
-# Load data
 try:
-    df_totals, df_capita, df_sector = load_data("datasets/CO2.xlsx")
-    df_events = load_events_data("datasets/Top_20_GDP_CO2_Events_1970_2022.csv")
-    df_land_area = load_land_area_data("datasets/land_area_data/API_AG.LND.TOTL.K2_DS2_en_csv_v2_323.csv")
-    df_gdp_growth = load_gdp_data("datasets/gdp_data/API_NY.GDP.MKTP.KD.ZG_DS2_en_csv_v2_40824.csv")
-except FileNotFoundError:
-    st.error("Data file not found. Please ensure the datasets directory contains 'CO2.xlsx' and the events CSV.")
+    df_totals, df_capita, df_sector = load_co2_data("datasets/co2_data")
+    df_events = load_events_data(
+        "datasets/Top_20_GDP_CO2_Events_1970_2022.csv",
+    )
+    df_gdp_growth = load_gdp_data(
+        "datasets/gdp_data/API_NY.GDP.MKTP.KD.ZG_DS2_en_csv_v2_40824.csv",
+    )
+except FileNotFoundError as e:
+    st.error(f"Data file not found: {e}.  Please ensure all dataset files are present.")
     st.stop()
 
-# --- Sidebar Filters ---
+
 with st.sidebar:
-    st.title("Project 1")
-    st.info("**Legend & Info:** Visualizing CO2 datasets with imputed and scaled values.")
-    
-    st.header("Global Filters")
-    min_y, max_y = int(df_totals['Year'].min()), int(df_totals['Year'].max())
-    year_range = st.slider("Time Range", min_y, max_y, (1970, max_y))
+    st.title("CO2 Dashboard")
 
-    st.divider()
 
-    show_events = st.checkbox("Show Historic Events", value=False)
+    st.header("Time Range")
+    min_y = int(df_totals["Year"].min())
+    max_y = int(df_totals["Year"].max())
+    year_range: tuple[int, int] = st.slider(
+        "Select period", min_y, max_y, (1970, max_y),
+    )
 
-    st.divider()
-    
-    available_countries = sorted(df_totals['Country'].unique())
-    all_countries_selected = st.checkbox("Select All Countries", value=False)
-    
-    if all_countries_selected:
-        selected_countries = available_countries
-        st.info(f"Including all {len(available_countries)} countries/regions.")
+
+    st.header("Country Selection")
+
+    country_lookup = df_totals[["ISOcode", "Country"]].drop_duplicates().set_index("ISOcode")["Country"].to_dict()
+    available_iso_codes: list[str] = sorted(country_lookup.keys())
+
+    def _on_preset_change():
+        """Callback: when the preset dropdown changes, push the corresponding
+        ISO code list into the multiselect's session-state key."""
+        choice = st.session_state["preset_key"]
+        if choice != "Custom":
+            st.session_state["country_ms"] = [
+                iso for iso in COUNTRY_PRESETS[choice] if iso in available_iso_codes
+            ]
+
+    preset_choice = st.selectbox(
+        "Choose a Group",
+        list(COUNTRY_PRESETS.keys()),
+        index=0,
+        key="preset_key",
+        on_change=_on_preset_change,
+    )
+
+    # Provide a sensible default only on the very first render
+    if "country_ms" not in st.session_state:
+        initial_default = [
+            iso for iso in ["USA", "CHN", "IND"]
+            if iso in available_iso_codes
+        ]
     else:
-        defaults = [c for c in ["USA", "China", "India"] if c in available_countries]
-        selected_countries = st.multiselect("Select Specific Countries", available_countries, default=defaults)
+        initial_default = st.session_state["country_ms"]
 
-if not selected_countries:
+    selected_iso_codes: list[str] = st.multiselect(
+        "Select Specific Countries",
+        available_iso_codes,
+        default=initial_default,
+        format_func=lambda iso: f"{country_lookup.get(iso, iso)} ({iso})",
+        key="country_ms",
+    )
+
+    st.caption(f"**{len(selected_iso_codes)}** countries selected")
+
+    st.header("Timeline")
+    show_events = st.checkbox(
+        "Show Historic Events", value=False, key="evt_global",
+    )
+    if show_events:
+        event_origins = sorted(df_events["Country"].unique())
+        evt_origins = st.multiselect(
+            "Filter by origin", event_origins, default=event_origins,
+            key="evt_cats_global",
+        )
+        evt_iso_codes = df_events[df_events["Country"].isin(evt_origins)]["ISOcode"].unique().tolist()
+    else:
+        evt_iso_codes = []
+
+if not selected_iso_codes:
     st.warning("Please select at least one country to view the dashboard.")
     st.stop()
 
-#region filter data
-mask_totals = (df_totals['Country'].isin(selected_countries)) & (df_totals['Year'].between(*year_range))
-df_t_filtered = df_totals[mask_totals]
-latest_year = df_t_filtered['Year'].max()
 
-mask_capita = (df_capita['Country'].isin(selected_countries)) & (df_capita['Year'].between(*year_range))
+mask_totals = (
+    df_totals["ISOcode"].isin(selected_iso_codes)
+    & df_totals["Year"].between(*year_range)
+)
+df_t_filtered = df_totals[mask_totals]
+
+latest_year: int = (
+    int(df_t_filtered["Year"].max()) if not df_t_filtered.empty else year_range[1]
+)
+
+mask_capita = (
+    df_capita["ISOcode"].isin(selected_iso_codes)
+    & df_capita["Year"].between(*year_range)
+)
 df_c_filtered = df_capita[mask_capita]
 
-mask_sector = (df_sector['Country'].isin(selected_countries)) & (df_sector['Year'].between(*year_range))
+mask_sector = (
+    df_sector["ISOcode"].isin(selected_iso_codes)
+    & df_sector["Year"].between(*year_range)
+)
 df_s_filtered = df_sector[mask_sector]
 
-# --- Dashboard UI ---
-st.title("CO2 Emissions Analysis Dashboard")
-tab1, tab2, tab3, tab4 = st.tabs(["CO2 Total", "CO2 per Capita", "CO2 per Sector", "GDP vs CO2"])
 
-# region total emmisions
+tab1, tab2, tab3 = st.tabs([
+    "The Big Picture",
+    "Equity & Economy",
+    "Sectoral Deep Dive",
+])
+
+
 with tab1:
-    # Top Row: Metrics
-    m1, m2, m3 = st.columns(3)
-    avg_emissions = df_t_filtered['CO2'].mean()
-    variance = df_t_filtered['CO2'].var() if len(df_t_filtered) > 1 else 0
-    m1.metric("Avg Emission", f"{avg_emissions:,.2f} Mt")
-    m2.metric("Variance", f"{variance:,.2e}")
-    m3.metric("Selected Countries", len(selected_countries))
-
-    # Graph Row 1: Treemap (sized by Land Area, colored by CO2)
-    st.subheader(f"Emissions Treemap by Land Area ({latest_year})")
-    if not df_t_filtered.empty:
-        # Filter land area data for the latest year and selected countries
-        df_land_area_latest = df_land_area[
-            (df_land_area['Year'] == latest_year) & 
-            (df_land_area['Country'].isin(selected_countries))
-        ]
-        
-        # Merge CO2 data with land area data
-        df_merged_for_treemap = pd.merge(
-            df_t_filtered[df_t_filtered['Year'] == latest_year],
-            df_land_area_latest[['Country', 'Land area (sq. km)']],
-            on='Country',
-            how='left'
-        )
-        
-        
-        # Drop rows where 'Land area (sq. km)' is NaN after merge
-        df_merged_for_treemap.dropna(subset=['Land area (sq. km)'], inplace=True)
-        
-        if df_merged_for_treemap.empty:
-            st.warning("No land area data available for the selected countries and year to display the treemap.")
-        else:
-            fig_tree = px.treemap(df_merged_for_treemap, 
-                                 path=['Country'], values='Land area (sq. km)',
-                                 color='CO2', color_continuous_scale='Reds',
-                                 hover_data={'CO2': ':.2f'})
-            st.plotly_chart(fig_tree, use_container_width=True)
-
-    # Graph Row 2: Trend
-    st.subheader("Emissions Trend Over Time")
-    fig_line = px.line(df_t_filtered, x='Year', y='CO2', color='Country', markers=len(selected_countries) < 10)
-    if show_events:
-        add_events_to_fig(fig_line, df_events, selected_countries, year_range)
-    st.plotly_chart(fig_line, use_container_width=True)
-
-
-# region per capita
-with tab2:
-    # Graph Row 1: Heatmap
-    st.subheader("Emissions per Capita Heatmap")
-    if not df_c_filtered.empty:
-        pivot_capita = df_c_filtered.pivot(index='Country', columns='Year', values='CO2_per_capita')
-        fig_heat = px.imshow(pivot_capita, color_continuous_scale='Viridis', aspect="auto")
-        st.plotly_chart(fig_heat, use_container_width=True)
-    
-
-    # Graph Row 2: Race Chart
-    st.subheader("Top 10 Race: Emitters Per Capita Over Time")
-    df_race = df_c_filtered.sort_values(['Year', 'CO2_per_capita'], ascending=[True, False])
-    df_race = df_race.groupby('Year').head(10).reset_index(drop=True)
-
-    if not df_race.empty:
-        x_limit = df_race['CO2_per_capita'].max() * 1.1
-        fig_race = px.bar(df_race, x="CO2_per_capita", y="Country", color="Country",
-                          animation_frame="Year", animation_group="Country", orientation='h',
-                          range_x=[0, x_limit], labels={'CO2_per_capita': 'Tonnes/Capita'})
-        fig_race.update_layout(yaxis={'categoryorder': 'total ascending'}, height=500, showlegend=False)
-        fig_race.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 600 
-        st.plotly_chart(fig_race, use_container_width=True)
-
-# region sector analysis
-with tab3:
-    # Graph Row 1: Sector Treemap
-    st.subheader(f"Regional Sector Breakdown ({latest_year})")
-    if not df_s_filtered.empty:
-        fig_sec_tree = px.treemap(df_s_filtered[df_s_filtered['Year'] == latest_year], 
-                                  path=['Country', 'Sector'], values='CO2', color='Sector')
-        st.plotly_chart(fig_sec_tree, use_container_width=True)
-
-    # Graph Row 2: Sector Composition Over Time
-    st.subheader("Sector Composition Over Time")
-    if not df_s_filtered.empty:
-        sector_agg = df_s_filtered.groupby(['Year', 'Sector'])['CO2'].sum().reset_index()
-        fig_area = px.area(sector_agg, x="Year", y="CO2", color="Sector")
-        st.plotly_chart(fig_area, use_container_width=True)
-
-    st.divider()
-
-    # Section 3: Deep Dive
-    st.subheader("Sector specific Analysis")
-    if not df_s_filtered.empty:
-        sector_list = sorted(df_s_filtered['Sector'].unique())
-        selected_sector = st.selectbox("Pick a Sector to analyze:", sector_list)
-        
-        sector_specific_df = df_s_filtered[
-            (df_s_filtered['Sector'] == selected_sector) & (df_s_filtered['Year'] == latest_year)
-        ]
-        
-        total_sector_co2 = sector_specific_df['CO2'].sum()
-        st.metric(f"Total {selected_sector} Emissions", f"{total_sector_co2:,.2f} Mt")
-        
-        # Graph Row 4: Drill-down Bar Chart
-        fig_dom = px.bar(sector_specific_df.sort_values('CO2', ascending=False),
-                        x='CO2', y='Country', orientation='h', color='CO2',
-                        color_continuous_scale='Viridis', title=f"Country Ranking in {selected_sector}")
-        st.plotly_chart(fig_dom, use_container_width=True)
-
-# region gdp vs co2
-with tab4:
-    st.subheader("CO2 Emissions vs. GDP Growth (Annual %)")
-    
-    # Allow user to select a single year for this plot
-    min_gdp_year = max(df_t_filtered['Year'].min(), df_gdp_growth['Year'].min())
-    max_gdp_year = min(df_t_filtered['Year'].max(), df_gdp_growth['Year'].max())
-    
-    if min_gdp_year > max_gdp_year:
-        st.warning("No overlapping years for CO2 emissions and GDP growth data with current filters.")
-        st.stop()
-        
-    gdp_year = st.slider("Select Year for GDP vs CO2 Plot", 
-                         min_gdp_year, max_gdp_year, max_gdp_year)
-    
-    st.subheader(f"CO2 Emissions vs. GDP Growth (Annual %) in {gdp_year}")
-
-    # Filter CO2 and GDP data for the selected year and countries
-    df_t_gdp_year = df_totals[
-        (df_totals['Country'].isin(selected_countries)) &
-        (df_totals['Year'] == gdp_year)
-    ]
-    df_gdp_gdp_year = df_gdp_growth[
-        (df_gdp_growth['Country'].isin(selected_countries)) &
-        (df_gdp_growth['Year'] == gdp_year)
-    ]
-    
-    # Merge CO2 totals with GDP growth data for the selected year
-    df_merged_gdp_co2 = pd.merge(
-        df_t_gdp_year,
-        df_gdp_gdp_year,
-        on=['Country', 'Year'],
-        how='inner'  # Use inner merge to only keep rows with both CO2 and GDP data
+    render_tab1_charts(
+        df_t_filtered=df_t_filtered,
+        df_c_filtered=df_c_filtered,
+        df_events=df_events,
+        selected_iso_codes=selected_iso_codes,
+        year_range=year_range,
+        latest_year=latest_year,
+        show_events=show_events,
+        evt_iso_codes=evt_iso_codes,
     )
-    
-    # Drop rows with NaN values in either CO2 or GDP Growth (annual %)
-    df_merged_gdp_co2.dropna(subset=['CO2', 'GDP Growth (annual %)'], inplace=True)
-    
-    if df_merged_gdp_co2.empty:
-        st.warning(f"No combined CO2 and GDP growth data available for the selected countries in {gdp_year}.")
-    else:
-        fig_gdp_co2 = px.scatter(df_merged_gdp_co2, 
-                                 x='CO2', 
-                                 y='GDP Growth (annual %)', 
-                                 color='Country',
-                                 hover_name='Country',
-                                 hover_data={'Year': True, 
-                                               'CO2': ':.2f', 
-                                               'GDP Growth (annual %)': ':.2f'}
-                                )
-        fig_gdp_co2.update_layout(xaxis_title="CO2 Emissions (Mt)",
-                                 yaxis_title="GDP Growth (Annual %)")
-        st.plotly_chart(fig_gdp_co2, use_container_width=True)
+
+
+with tab2:
+    render_tab2_charts(
+        df_t_filtered=df_t_filtered,
+        df_c_filtered=df_c_filtered,
+        df_totals=df_totals,
+        df_gdp_growth=df_gdp_growth,
+        df_events=df_events,
+        selected_iso_codes=selected_iso_codes,
+        year_range=year_range,
+        show_events=show_events,
+        evt_iso_codes=evt_iso_codes,
+    )
+
+
+with tab3:
+    render_tab3_charts(
+        df_s_filtered=df_s_filtered,
+        df_events=df_events,
+        selected_iso_codes=selected_iso_codes,
+        year_range=year_range,
+        latest_year=latest_year,
+        show_events=show_events,
+        evt_iso_codes=evt_iso_codes,
+    )
+
+
+st.divider()
+st.caption(
+    "Data: [EDGAR v8.0](https://edgar.jrc.ec.europa.eu/) · "
+    "[World Bank Open Data](https://data.worldbank.org/)  —  "
+    "Built with Streamlit & Plotly"
+)
