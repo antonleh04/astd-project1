@@ -25,6 +25,23 @@ CLIMATE_QUALITATIVE: list[str] = [
     "#2F4F4F",  # dark slate
 ]
 
+# Semantic color aliases for specific use cases across charts
+COLORS = {
+    # Data series
+    "co2_change": "#E85D3A",     # warm red-orange for CO2/emissions changes
+    "gdp_growth": "#4A90D9",     # steel blue for economic indicators
+    # Value judgements
+    "positive": "#2E8B57",       # sea green for positive/good values
+    "negative": "#E85D3A",       # red-orange for negative/bad values
+    "neutral": "#708090",        # slate grey for neutral elements
+    # Event annotations
+    "global_event": "#4A90D9",   # blue for global events
+    "local_event": "#E85D3A",    # red-orange for country-specific events
+    # Chart elements
+    "stem_line": "#c5d8cf",      # light color for lollipop chart stems
+    "zero_line": "#708090",      # slate grey for zero reference lines
+}
+
 PLOTLY_TEMPLATE = "plotly_white"
 CHART_MARGIN = dict(l=50, r=30, t=30, b=50)
 
@@ -128,6 +145,7 @@ CUSTOM_CSS = """
     /* Soft dividers */
         hr { border-color: #c5d8cf !important; }
     }
+
 
     /* ─── Compact Sidebar Overrides ─── */
     [data-testid="stSidebar"] .block-container {

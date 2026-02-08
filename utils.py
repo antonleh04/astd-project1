@@ -7,6 +7,8 @@ Helper functions for event filtering and annotation.
 import pandas as pd
 import plotly.graph_objects as go
 
+from config import COLORS
+
 
 # =============================================================================
 # EVENT HELPERS
@@ -42,7 +44,7 @@ def add_events_to_fig(
 
     for i, (_, event) in enumerate(filtered.iterrows()):
         is_global  = event["ISOcode"] == "GLOBAL"
-        line_color = "#4A90D9" if is_global else "#E85D3A"
+        line_color = COLORS["global_event"] if is_global else COLORS["local_event"]
         y_ref      = y_positions[i % len(y_positions)]
 
         fig.add_vline(

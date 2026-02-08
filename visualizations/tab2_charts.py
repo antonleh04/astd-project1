@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import numpy as np
 from statsmodels.tsa.stattools import ccf
 
-from config import CLIMATE_QUALITATIVE, PLOTLY_TEMPLATE, CHART_MARGIN
+from config import CLIMATE_QUALITATIVE, COLORS, PLOTLY_TEMPLATE, CHART_MARGIN
 from utils import add_events_to_fig
 
 
@@ -306,12 +306,12 @@ def render_tab2_charts(
         fig_ts.add_trace(go.Scatter(
             x=merged_ccf["Year"], y=merged_ccf["CO2_YoY_Change"],
             mode="lines+markers", name="CO2 YoY Change (%)",
-            line=dict(color="#E85D3A", width=2), marker=dict(size=4),
+            line=dict(color=COLORS["co2_change"], width=2), marker=dict(size=4),
         ))
         fig_ts.add_trace(go.Scatter(
             x=merged_ccf["Year"], y=merged_ccf["GDP Growth (annual %)"],
             mode="lines+markers", name="GDP Growth (%)",
-            line=dict(color="#4A90D9", width=2), marker=dict(size=4),
+            line=dict(color=COLORS["gdp_growth"], width=2), marker=dict(size=4),
             yaxis="y2",
         ))
         fig_ts.update_layout(
@@ -319,13 +319,13 @@ def render_tab2_charts(
             xaxis=dict(title="Year"),
             yaxis=dict(
                 title="CO2 YoY Change (%)",
-                title_font=dict(color="#E85D3A"),
-                tickfont=dict(color="#E85D3A"),
+                title_font=dict(color=COLORS["co2_change"]),
+                tickfont=dict(color=COLORS["co2_change"]),
             ),
             yaxis2=dict(
                 title="GDP Growth (%)",
-                title_font=dict(color="#4A90D9"),
-                tickfont=dict(color="#4A90D9"),
+                title_font=dict(color=COLORS["gdp_growth"]),
+                tickfont=dict(color=COLORS["gdp_growth"]),
                 overlaying="y", side="right",
             ),
             legend=dict(
@@ -372,13 +372,13 @@ def render_tab2_charts(
                 fig_ccf.add_trace(go.Scatter(
                     x=[lag_v, lag_v], y=[0, corr_v],
                     mode="lines",
-                    line=dict(color="#c5d8cf", width=2),
+                    line=dict(color=COLORS["stem_line"], width=2),
                     showlegend=False, hoverinfo="skip",
                 ))
 
             # Coloured markers on top of each stem
             colors_ccf = [
-                "#E85D3A" if c < 0 else "#2E8B57" for c in ccf_subset
+                COLORS["negative"] if c < 0 else COLORS["positive"] for c in ccf_subset
             ]
             fig_ccf.add_trace(go.Scatter(
                 x=lags, y=ccf_subset, mode="markers",
@@ -390,7 +390,7 @@ def render_tab2_charts(
                 hovertemplate="<b>Lag %{x} yr</b><br>r = %{y:.3f}<extra></extra>",
             ))
             fig_ccf.add_hline(
-                y=0, line_dash="dash", line_color="#708090", line_width=1,
+                y=0, line_dash="dash", line_color=COLORS["zero_line"], line_width=1,
             )
             fig_ccf.update_layout(
                 template=PLOTLY_TEMPLATE, height=420, showlegend=False,
