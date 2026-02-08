@@ -30,7 +30,7 @@ def render_tab2_charts(
     # ── Emissions Trajectory: Per Capita vs Total ────────────────────────────
     st.subheader("Emissions Trajectory: Per Capita vs Total")
     st.caption(
-        "Press ▶ Play to watch each country's path through emissions space over time. "
+        "Press Play to watch each country's path through emissions space over time. "
         "The trajectory shows how total and per-capita emissions evolve together."
     )
 

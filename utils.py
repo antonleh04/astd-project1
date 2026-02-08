@@ -42,7 +42,6 @@ def add_events_to_fig(
 
     for i, (_, event) in enumerate(filtered.iterrows()):
         is_global  = event["ISOcode"] == "GLOBAL"
-        icon       = "\U0001F30D" if is_global else "\U0001F4CD"
         line_color = "#4A90D9" if is_global else "#E85D3A"
         y_ref      = y_positions[i % len(y_positions)]
 
@@ -52,7 +51,7 @@ def add_events_to_fig(
         )
         fig.add_annotation(
             x=event["Year"], y=y_ref, yref="paper",
-            text=f"{icon} {event['Event']}",
+            text=f"{event['Event']}",
             showarrow=True, arrowhead=2, arrowsize=0.8,
             arrowwidth=1, arrowcolor=line_color,
             ax=20, ay=-20,

@@ -35,7 +35,6 @@ from visualizations import render_tab1_charts, render_tab2_charts, render_tab3_c
 st.set_page_config(
     page_title="ALLSTAT CO2 Dashboard",
     layout="wide",
-    page_icon="\U0001F30D",
 )
 
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -63,7 +62,7 @@ except FileNotFoundError as e:
 # =============================================================================
 
 with st.sidebar:
-    st.title("\U0001F30D CO2 Dashboard")
+    st.title("CO2 Dashboard")
     st.caption("Explore global emissions across countries, sectors, and time.")
 
     # ── Time range slider ────────────────────────────────────────────────────
@@ -118,7 +117,7 @@ with st.sidebar:
     st.caption(f"**{len(selected_iso_codes)}** countries selected")
 
     # ── Timeline Settings ─────────────────────────────────────────────────
-    st.header("\U0001F4C5 Timeline")
+    st.header("Timeline")
     show_events = st.checkbox(
         "Show Historic Events", value=False, key="evt_global",
     )
@@ -171,9 +170,9 @@ df_s_filtered = df_sector[mask_sector]
 # =============================================================================
 
 tab1, tab2, tab3 = st.tabs([
-    "\U0001F30D  The Big Picture",
-    "\U0001F4B0  Equity & Economy",
-    "\U0001F3ED  Sectoral Deep Dive",
+    "The Big Picture",
+    "Equity & Economy",
+    "Sectoral Deep Dive",
 ])
 
 
