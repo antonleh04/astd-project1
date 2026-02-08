@@ -51,8 +51,7 @@ def render_tab1_charts(
 
     # delta_color="inverse" → green when emissions decrease (good for climate)
     m1.metric(
-        "Latest Annual Total", f"{latest_total:,.0f} Mt", f"{yoy:+.1f}% YoY",
-        delta_color="inverse",
+        "Latest Annual Total", f"{latest_total:,.0f} Mt"
     )
     m2.metric(
         "Cumulative Total", 
@@ -70,6 +69,7 @@ def render_tab1_charts(
 
     # ── Emissions trend (line chart) ─────────────────────────────────────────
     st.subheader("Emissions Trend Over Time")
+    st.caption("Evolution of annual CO2 emissions for the selected countries.")
 
     fig_trend = go.Figure()
     for idx, iso_code in enumerate(selected_iso_codes):
@@ -131,27 +131,22 @@ def render_tab1_charts(
     tm_col1, tm_col2 = st.columns([1, 2])
     with tm_col1:
         size_mode = st.radio(
-            "Size Rectangles By:",
-            ["Total Emissions (Physical)", "Log Scale (Compromise)"],
-            horizontal=False,
-            help=(
-                "Physical: True scale (China is 1000x Luxembourg).\n"
-                "Log Scale: Compresses size differences so small countries are visible."
-            )
+            "Size By:",
+            ["Absolute", "Log Scale"],
+            horizontal=True,
         )
 
     if not df_tree.empty:
         # Add log column (use shift+1 to handle <1 Mt values safely)
         df_tree["CO2_log"] = np.log10(df_tree["CO2"].clip(lower=0.1) + 1)
     
-    if size_mode == "Total Emissions (Physical)":
+    if size_mode == "Absolute":
         size_col = "CO2"
     else:
         size_col = "CO2_log"
     
     st.caption(
-        f"Each rectangle is proportional to **{size_mode}**. "
-        "The colour intensity shows **Emissions Per Capita** (Red = High Intensity)."
+        "Rectangles are sized by total emissions. Color represents per-capita emissions."
     )
 
     if df_tree.empty:

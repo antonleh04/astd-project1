@@ -29,6 +29,7 @@ def render_tab3_charts(
 
     # ── Stacked area: sector composition for selected countries ──────────────
     st.subheader("Sector Composition Over Time")
+    st.caption("Breakdown of emissions by sector (Power, Transport, Buildings, etc.) over the selected period.")
     
     # Toggle for chart mode
     chart_mode = st.radio(
@@ -185,6 +186,7 @@ def render_tab3_charts(
 
     # ── Sectoral Fingerprint Treemap ─────────────────────────────────────────
     st.subheader(f"Sectoral Fingerprint ({latest_year})")
+    st.caption("Compare the sectoral makeup of different countries for the latest available year.")
     
     # Grid layout for controls
     c1, c2 = st.columns([1, 1])
