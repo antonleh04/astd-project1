@@ -1,34 +1,34 @@
-Year,Country,Event,Description
-1973,Global,First Oil Crisis,OPEC oil embargo; triggered energy efficiency policies in West.
-1979,Global,Second Oil Crisis,Iranian Revolution; further spike in oil prices and shift to nuclear/coal.
-1991,Global,Collapse of USSR,Massive drop in industrial output and emissions in Eastern Bloc.
-1997,Global,Kyoto Protocol signed,First international treaty to mandate GHG reductions.
-2008,Global,Global Financial Crisis,Worldwide recession leading to a sharp dip in industrial CO2.
-2015,Global,Paris Agreement,Global commitment to limit warming to 1.5-2 degrees Celsius.
-2020,Global,COVID-19 Pandemic,Lockdowns caused the largest single-year CO2 drop in history.
-1970,USA,Clean Air Act,Set first major federal standards for air pollution.
-2008,USA,Shale Revolution begins,"Fracking boom led to coal-to-gas switching, lowering emissions."
-1978,China,Reform and Opening-up,Beginning of rapid industrialization and coal consumption.
-2001,China,WTO Accession,Massive surge in manufacturing/exports; emissions skyrocketed.
-2015,China,Structural Economic Reforms,Shift toward service sector slowed emission growth rate.
-2011,Japan,Fukushima Nuclear Disaster,Nuclear shutdown; replaced by coal and LNG power.
-1990,Japan,Asset Bubble Burst,Beginning of long-term economic and emission stagnation.
-1990,Germany,German Reunification,Closure of inefficient East German heavy industry.
-2010,Germany,Energiewende Policy,Formal shift toward renewable energy dominance.
-1991,India,Economic Liberalization,Opening of markets; start of rapid coal-led energy demand.
-1990,UK,Dash for Gas,Privatization and shift from coal to natural gas power.
-2015,UK,Coal Phase-out Commitment,Rapid decline of coal in the power mix.
-1974,France,Messmer Plan,Massive nuclear power expansion following 1973 oil crisis.
-1991,Russia,Post-Soviet Industrial Collapse,Industrial output and CO2 fell by nearly 40% in a decade.
-2000,Canada,Oil Sands Expansion,Ramp up in high-intensity oil extraction in Alberta.
-2005,"Italy, San Marino and the Holy See",Industrial Stagnation,Gradual decline in emissions due to slowing manufacturing.
-2004,Brazil,Amazon Deforestation Peak,High emissions from land-use change before stricter enforcement.
-2003,Australia,Mining Boom Peak,Expansion of coal and iron ore exports.
-1973,South Korea,Heavy-Chemical Industry Drive,Aggressive expansion into steel and shipbuilding.
-1994,Mexico,NAFTA,Industrial growth due to North American trade integration.
-2004,Spain,Renewables Expansion,Massive subsidies for wind and solar power introduced.
-1997,Indonesia,Asian Financial Crisis & Peat Fires,Massive CO2 spike from forest fires during El Niño.
-2016,Saudi Arabia,Vision 2030 Launched,Plan to diversify away from oil and focus on efficiency.
-2013,Netherlands,Groningen Gas Peak,Peak production of domestic gas; transition to wind started.
-2002,Turkey,AKP Industrialization Era,Sustained high GDP and emissions growth.
-2017,Switzerland,Energy Strategy 2050,Public vote to phase out nuclear and increase renewables.
+Year,Country,ISOcode,Event,Description
+1973,Global,GLOBAL,First Oil Crisis,OPEC oil embargo; triggered energy efficiency policies in West.
+1979,Global,GLOBAL,Second Oil Crisis,Iranian Revolution; further spike in oil prices and shift to nuclear/coal.
+1991,Global,GLOBAL,Collapse of USSR,Massive drop in industrial output and emissions in Eastern Bloc.
+1997,Global,GLOBAL,Kyoto Protocol signed,First international treaty to mandate GHG reductions.
+2008,Global,GLOBAL,Global Financial Crisis,Worldwide recession leading to a sharp dip in industrial CO2.
+2015,Global,GLOBAL,Paris Agreement,Global commitment to limit warming to 1.5-2 degrees Celsius.
+2020,Global,GLOBAL,COVID-19 Pandemic,Lockdowns caused the largest single-year CO2 drop in history.
+1970,USA,USA,Clean Air Act,Set first major federal standards for air pollution.
+2008,USA,USA,Shale Revolution begins,"Fracking boom led to coal-to-gas switching, lowering emissions."
+1978,China,CHN,Reform and Opening-up,Beginning of rapid industrialization and coal consumption.
+2001,China,CHN,WTO Accession,Massive surge in manufacturing/exports; emissions skyrocketed.
+2015,China,CHN,Structural Economic Reforms,Shift toward service sector slowed emission growth rate.
+2011,Japan,JPN,Fukushima Nuclear Disaster,Nuclear shutdown; replaced by coal and LNG power.
+1990,Japan,JPN,Asset Bubble Burst,Beginning of long-term economic and emission stagnation.
+1990,Germany,DEU,German Reunification,Closure of inefficient East German heavy industry.
+2010,Germany,DEU,Energiewende Policy,Formal shift toward renewable energy dominance.
+1991,India,IND,Economic Liberalization,Opening of markets; start of rapid coal-led energy demand.
+1990,UK,GBR,Dash for Gas,Privatization and shift from coal to natural gas power.
+2015,UK,GBR,Coal Phase-out Commitment,Rapid decline of coal in the power mix.
+1974,France,FRA,Messmer Plan,Massive nuclear power expansion following 1973 oil crisis.
+1991,Russia,RUS,Post-Soviet Industrial Collapse,Industrial output and CO2 fell by nearly 40% in a decade.
+2000,Canada,CAN,Oil Sands Expansion,Ramp up in high-intensity oil extraction in Alberta.
+2005,"Italy, San Marino and the Holy See",ITA,Industrial Stagnation,Gradual decline in emissions due to slowing manufacturing.
+2004,Brazil,BRA,Amazon Deforestation Peak,High emissions from land-use change before stricter enforcement.
+2003,Australia,AUS,Mining Boom Peak,Expansion of coal and iron ore exports.
+1973,South Korea,KOR,Heavy-Chemical Industry Drive,Aggressive expansion into steel and shipbuilding.
+1994,Mexico,MEX,NAFTA,Industrial growth due to North American trade integration.
+2004,Spain,ESP,Renewables Expansion,Massive subsidies for wind and solar power introduced.
+1997,Indonesia,IDN,Asian Financial Crisis & Peat Fires,Massive CO2 spike from forest fires during El Niño.
+2016,Saudi Arabia,SAU,Vision 2030 Launched,Plan to diversify away from oil and focus on efficiency.
+2013,Netherlands,NLD,Groningen Gas Peak,Peak production of domestic gas; transition to wind started.
+2002,Turkey,TUR,AKP Industrialization Era,Sustained high GDP and emissions growth.
+2017,Switzerland,CHE,Energy Strategy 2050,Public vote to phase out nuclear and increase renewables.

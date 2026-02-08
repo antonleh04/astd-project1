@@ -9,109 +9,17 @@ import pandas as pd
 
 
 # =============================================================================
-# ISO CODE MAPPING
-# =============================================================================
-
-@st.cache_data
-def get_country_iso_mapping() -> dict[str, str]:
-    """Return a lookup table that maps country/event names to ISO codes.
-    Used for events data which doesn't have ISO codes."""
-    return {
-        # Events data mappings
-        "Global": "GLOBAL",
-        "World": "GLOBAL",
-        "United States": "USA",
-        "China": "CHN",
-        "Germany": "DEU",
-        "Japan": "JPN",
-        "United Kingdom": "GBR",
-        "France": "FRA",
-        "Italy": "ITA",
-        "India": "IND",
-        "Russia": "RUS",
-        "Brazil": "BRA",
-        "Canada": "CAN",
-        "Australia": "AUS",
-        "South Korea": "KOR",
-        "Mexico": "MEX",
-        "Spain": "ESP",
-        "Indonesia": "IDN",
-        "Netherlands": "NLD",
-        "Saudi Arabia": "SAU",
-        "Turkey": "TUR",
-        "Switzerland": "CHE",
-        "Poland": "POL",
-        "Belgium": "BEL",
-        "Sweden": "SWE",
-        "Iran": "IRN",
-        "Austria": "AUT",
-        "Norway": "NOR",
-        "United Arab Emirates": "ARE",
-        "Argentina": "ARG",
-        "South Africa": "ZAF",
-        "Denmark": "DNK",
-        "Thailand": "THA",
-        "Malaysia": "MYS",
-        "Singapore": "SGP",
-        "Israel": "ISR",
-        "Hong Kong": "HKG",
-        "Finland": "FIN",
-        "Chile": "CHL",
-        "Portugal": "PRT",
-        "Greece": "GRC",
-        "Czech Republic": "CZE",
-        "Czechia": "CZE",
-        "Romania": "ROU",
-        "Vietnam": "VNM",
-        "New Zealand": "NZL",
-        "Iraq": "IRQ",
-        "Kuwait": "KWT",
-        "Qatar": "QAT",
-        "Kazakhstan": "KAZ",
-        "Ukraine": "UKR",
-        "Egypt": "EGY",
-        "Pakistan": "PAK",
-        "Philippines": "PHL",
-        "Algeria": "DZA",
-        "Colombia": "COL",
-        "Bangladesh": "BGD",
-        "Hungary": "HUN",
-        "Slovakia": "SVK",
-        "Bulgaria": "BGR",
-        "Croatia": "HRV",
-        "Lithuania": "LTU",
-        "Slovenia": "SVN",
-        "Latvia": "LVA",
-        "Estonia": "EST",
-        "Luxembourg": "LUX",
-        "Cyprus": "CYP",
-        "Malta": "MLT",
-        "Ireland": "IRL",
-        "Bahrain": "BHR",
-        "Brunei": "BRN",
-        "North Korea": "PRK",
-    }
-
-
-def add_iso_codes_to_events(df: pd.DataFrame) -> pd.DataFrame:
-    """Add ISO codes to events dataframe based on country names."""
-    iso_mapping = get_country_iso_mapping()
-    df["ISOcode"] = df["Country"].map(lambda x: iso_mapping.get(x, x))
-    return df
-
-
-# =============================================================================
 # DATA LOADERS
 # =============================================================================
 
 @st.cache_data
 def load_events_data(file_path: str) -> pd.DataFrame:
-    """Load curated climate/economic events CSV and add ISO codes."""
+    """Load curated climate/economic events CSV with ISO codes."""
     df = pd.read_csv(file_path)
     df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
     df.dropna(subset=["Year"], inplace=True)
     df["Year"] = df["Year"].astype(int)
-    return add_iso_codes_to_events(df)
+    return df
 
 
 @st.cache_data
