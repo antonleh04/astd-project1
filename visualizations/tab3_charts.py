@@ -9,6 +9,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
 from plotly.subplots import make_subplots
 
 from config import CLIMATE_QUALITATIVE, PLOTLY_TEMPLATE
@@ -184,21 +185,73 @@ def render_tab3_charts(
 
     # ── Sectoral Fingerprint Treemap ─────────────────────────────────────────
     st.subheader(f"Sectoral Fingerprint ({latest_year})")
-    # st.markdown("##### Sector Breakdown Treemap")
+    
+    # Grid layout for controls
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        # Hierarchy Control: Country vs Sector first
+        hierarchy_mode = st.radio(
+            "Group By:",
+            ["Country \u2192 Sector", "Sector \u2192 Country"],
+            horizontal=True,
+            help=(
+                "Country \u2192 Sector: View each country's economy.\n"
+                "Sector \u2192 Country: View global industries (e.g. Total Transport)."
+            )
+        )
+    
+    with c2:
+        # Sizing Control (from Tab 1 feedback)
+        size_mode_tm = st.radio(
+            "Size By:",
+            ["Total Emissions", "Log Scale"],
+            horizontal=True,
+            index=0
+        )
+
     if not df_s_filtered.empty:
-        df_sec_tree = df_s_filtered[df_s_filtered["Year"] == latest_year]
+        df_sec_tree = df_s_filtered[df_s_filtered["Year"] == latest_year].copy()
+        
         if not df_sec_tree.empty:
+            # 1. Handle Sizing Strategy
+            if size_mode_tm == "Log Scale":
+                df_sec_tree["Value"] = np.log10(df_sec_tree["CO2"].clip(lower=0.1) + 1)
+                value_label = "Log Emissions"
+            else:
+                df_sec_tree["Value"] = df_sec_tree["CO2"]
+                value_label = "Emissions (Mt)"
+
+            # 2. Handle Hierarchy Strategy
+            if hierarchy_mode == "Country \u2192 Sector":
+                path = ["Country", "Sector"]
+            else:
+                path = ["Sector", "Country"]
+
             fig_sec_tm = px.treemap(
                 df_sec_tree,
-                path=["Country", "Sector"],
-                values="CO2",
+                path=path,
+                values="Value",
                 color="Sector",
                 color_discrete_sequence=CLIMATE_QUALITATIVE,
+                hover_data={"CO2": ":.1f"},
             )
+            
+            fig_sec_tm.update_traces(
+                hovertemplate=(
+                    "<b>%{label}</b><br>"
+                    "Parent: %{parent}<br>"
+                    "CO2: %{customdata[0]:,.1f} Mt<extra></extra>"
+                ),
+                root_color="rgba(0,0,0,0)",
+                marker=dict(line=dict(width=2, color="#0E1117")) # Dark border to simulate gaps
+            )
+            
             fig_sec_tm.update_layout(
                 template=PLOTLY_TEMPLATE,
-                height=500,
-                margin=dict(l=10, r=10, t=30, b=10),
+                height=550,
+                margin=dict(l=10, r=10, t=10, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
             )
             st.plotly_chart(fig_sec_tm, use_container_width=True)
         else:
