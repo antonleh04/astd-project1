@@ -9,43 +9,94 @@ import pandas as pd
 
 
 # =============================================================================
-# COUNTRY NAME MAPPING
+# ISO CODE MAPPING
 # =============================================================================
 
 @st.cache_data
-def get_country_name_mapping() -> dict[str, str]:
-    """Return a lookup table that maps common / World Bank country names to the
-    naming convention used in the EDGAR CO2 dataset."""
+def get_country_iso_mapping() -> dict[str, str]:
+    """Return a lookup table that maps country/event names to ISO codes.
+    Used for events data which doesn't have ISO codes."""
     return {
-        "Italy": "Italy, San Marino and the Holy See",
-        "Russian Federation": "Russia",
-        "France": "France and Monaco",
-        "Spain": "Spain and Andorra",
-        "Switzerland": "Switzerland and Liechtenstein",
-        "Israel": "Israel and Palestine, State of",
-        "Korea, Rep.": "South Korea",
-        "Korea, Dem. People's Rep.": "North Korea",
-        "United States": "United States",
-        "United Kingdom": "United Kingdom",
-        "China": "China",
-        "Germany": "Germany",
-        "Japan": "Japan",
-        "India": "India",
-        "Canada": "Canada",
-        "Australia": "Australia",
-        "Brazil": "Brazil",
-        "Mexico": "Mexico",
-        "USA": "United States",
-        "US": "United States",
-        "United States of America": "United States",
+        # Events data mappings
+        "Global": "GLOBAL",
+        "World": "GLOBAL",
+        "United States": "USA",
+        "China": "CHN",
+        "Germany": "DEU",
+        "Japan": "JPN",
+        "United Kingdom": "GBR",
+        "France": "FRA",
+        "Italy": "ITA",
+        "India": "IND",
+        "Russia": "RUS",
+        "Brazil": "BRA",
+        "Canada": "CAN",
+        "Australia": "AUS",
+        "South Korea": "KOR",
+        "Mexico": "MEX",
+        "Spain": "ESP",
+        "Indonesia": "IDN",
+        "Netherlands": "NLD",
+        "Saudi Arabia": "SAU",
+        "Turkey": "TUR",
+        "Switzerland": "CHE",
+        "Poland": "POL",
+        "Belgium": "BEL",
+        "Sweden": "SWE",
+        "Iran": "IRN",
+        "Austria": "AUT",
+        "Norway": "NOR",
+        "United Arab Emirates": "ARE",
+        "Argentina": "ARG",
+        "South Africa": "ZAF",
+        "Denmark": "DNK",
+        "Thailand": "THA",
+        "Malaysia": "MYS",
+        "Singapore": "SGP",
+        "Israel": "ISR",
+        "Hong Kong": "HKG",
+        "Finland": "FIN",
+        "Chile": "CHL",
+        "Portugal": "PRT",
+        "Greece": "GRC",
+        "Czech Republic": "CZE",
+        "Czechia": "CZE",
+        "Romania": "ROU",
+        "Vietnam": "VNM",
+        "New Zealand": "NZL",
+        "Iraq": "IRQ",
+        "Kuwait": "KWT",
+        "Qatar": "QAT",
+        "Kazakhstan": "KAZ",
+        "Ukraine": "UKR",
+        "Egypt": "EGY",
+        "Pakistan": "PAK",
+        "Philippines": "PHL",
+        "Algeria": "DZA",
+        "Colombia": "COL",
+        "Bangladesh": "BGD",
+        "Hungary": "HUN",
+        "Slovakia": "SVK",
+        "Bulgaria": "BGR",
+        "Croatia": "HRV",
+        "Lithuania": "LTU",
+        "Slovenia": "SVN",
+        "Latvia": "LVA",
+        "Estonia": "EST",
+        "Luxembourg": "LUX",
+        "Cyprus": "CYP",
+        "Malta": "MLT",
+        "Ireland": "IRL",
+        "Bahrain": "BHR",
+        "Brunei": "BRN",
+        "North Korea": "PRK",
     }
 
 
-def normalize_country_names(df: pd.DataFrame, country_column: str = "Country") -> pd.DataFrame:
-    """Apply the name-mapping table so every dataset shares a consistent
-    country-name vocabulary."""
-    mapping = get_country_name_mapping()
-    df[country_column] = df[country_column].map(lambda x: mapping.get(x, x))
+def add_iso_codes_to_events(df: pd.DataFrame) -> pd.DataFrame:
+    """Add ISO codes to events dataframe based on country names."""
+    iso_mapping = get_country_iso_mapping()
+    df["ISOcode"] = df["Country"].map(lambda x: iso_mapping.get(x, x))
     return df
 
 
@@ -55,12 +106,12 @@ def normalize_country_names(df: pd.DataFrame, country_column: str = "Country") -
 
 @st.cache_data
 def load_events_data(file_path: str) -> pd.DataFrame:
-    """Load curated climate/economic events CSV and normalise country names."""
+    """Load curated climate/economic events CSV and add ISO codes."""
     df = pd.read_csv(file_path)
     df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
     df.dropna(subset=["Year"], inplace=True)
     df["Year"] = df["Year"].astype(int)
-    return normalize_country_names(df, "Country")
+    return add_iso_codes_to_events(df)
 
 
 @st.cache_data
@@ -95,9 +146,9 @@ def load_land_area_data(file_path: str) -> pd.DataFrame:
     df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
     df.dropna(subset=["Year"], inplace=True)
     df["Year"] = df["Year"].astype(int)
-    df.rename(columns={"Country Name": "Country"}, inplace=True)
+    df.rename(columns={"Country Name": "Country", "Country Code": "ISOcode"}, inplace=True)
     df["Land area (sq. km)"] = pd.to_numeric(df["Land area (sq. km)"], errors="coerce")
-    return normalize_country_names(df, "Country")
+    return df
 
 
 @st.cache_data
@@ -111,8 +162,8 @@ def load_gdp_data(file_path: str) -> pd.DataFrame:
     df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
     df.dropna(subset=["Year"], inplace=True)
     df["Year"] = df["Year"].astype(int)
-    df.rename(columns={"Country Name": "Country"}, inplace=True)
+    df.rename(columns={"Country Name": "Country", "Country Code": "ISOcode"}, inplace=True)
     df["GDP Growth (annual %)"] = pd.to_numeric(
         df["GDP Growth (annual %)"], errors="coerce",
     )
-    return normalize_country_names(df, "Country")
+    return df

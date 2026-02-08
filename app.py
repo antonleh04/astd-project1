@@ -82,15 +82,18 @@ with st.sidebar:
 
     # ── Country selection with preset groups ─────────────────────────────────
     st.header("Country Selection")
-    available_countries: list[str] = sorted(df_totals["Country"].unique())
+    
+    # Get available countries with their ISO codes
+    country_lookup = df_totals[["ISOcode", "Country"]].drop_duplicates().set_index("ISOcode")["Country"].to_dict()
+    available_iso_codes: list[str] = sorted(country_lookup.keys())
 
     def _on_preset_change():
         """Callback: when the preset dropdown changes, push the corresponding
-        country list into the multiselect's session-state key."""
+        ISO code list into the multiselect's session-state key."""
         choice = st.session_state["preset_key"]
         if choice != "Custom":
             st.session_state["country_ms"] = [
-                c for c in COUNTRY_PRESETS[choice] if c in available_countries
+                iso for iso in COUNTRY_PRESETS[choice] if iso in available_iso_codes
             ]
 
     preset_choice = st.selectbox(
@@ -104,21 +107,22 @@ with st.sidebar:
     # Provide a sensible default only on the very first render
     if "country_ms" not in st.session_state:
         initial_default = [
-            c for c in ["United States", "China", "India"]
-            if c in available_countries
+            iso for iso in ["USA", "CHN", "IND"]
+            if iso in available_iso_codes
         ]
     else:
         initial_default = st.session_state["country_ms"]
 
-    selected_countries: list[str] = st.multiselect(
+    selected_iso_codes: list[str] = st.multiselect(
         "Select Specific Countries",
-        available_countries,
+        available_iso_codes,
         default=initial_default,
+        format_func=lambda iso: f"{country_lookup.get(iso, iso)} ({iso})",
         key="country_ms",
     )
 
     st.divider()
-    st.caption(f"**{len(selected_countries)}** countries selected")
+    st.caption(f"**{len(selected_iso_codes)}** countries selected")
 
     # ── Timeline Settings ─────────────────────────────────────────────────
     st.header("\U0001F4C5 Timeline")
@@ -126,26 +130,28 @@ with st.sidebar:
         "Show Historic Events", value=False, key="evt_global",
     )
     if show_events:
-        categories = sorted(df_events["Country"].unique())
-        evt_cats = st.multiselect(
-            "Filter by origin", categories, default=categories,
+        event_origins = sorted(df_events["Country"].unique())
+        evt_origins = st.multiselect(
+            "Filter by origin", event_origins, default=event_origins,
             key="evt_cats_global",
         )
+        # Convert country names to ISO codes for filtering
+        evt_iso_codes = df_events[df_events["Country"].isin(evt_origins)]["ISOcode"].unique().tolist()
     else:
-        evt_cats = []
+        evt_iso_codes = []
 
 # Guard: nothing to show without at least one country
-if not selected_countries:
+if not selected_iso_codes:
     st.warning("Please select at least one country to view the dashboard.")
     st.stop()
 
 
 # =============================================================================
-# 4. FILTER DATA
+# 4. FILTER DATA BY ISO CODE
 # =============================================================================
 
 mask_totals = (
-    df_totals["Country"].isin(selected_countries)
+    df_totals["ISOcode"].isin(selected_iso_codes)
     & df_totals["Year"].between(*year_range)
 )
 df_t_filtered = df_totals[mask_totals]
@@ -155,13 +161,13 @@ latest_year: int = (
 )
 
 mask_capita = (
-    df_capita["Country"].isin(selected_countries)
+    df_capita["ISOcode"].isin(selected_iso_codes)
     & df_capita["Year"].between(*year_range)
 )
 df_c_filtered = df_capita[mask_capita]
 
 mask_sector = (
-    df_sector["Country"].isin(selected_countries)
+    df_sector["ISOcode"].isin(selected_iso_codes)
     & df_sector["Year"].between(*year_range)
 )
 df_s_filtered = df_sector[mask_sector]
@@ -188,11 +194,11 @@ with tab1:
         df_t_filtered=df_t_filtered,
         df_land_area=df_land_area,
         df_events=df_events,
-        selected_countries=selected_countries,
+        selected_iso_codes=selected_iso_codes,
         year_range=year_range,
         latest_year=latest_year,
         show_events=show_events,
-        evt_cats=evt_cats,
+        evt_iso_codes=evt_iso_codes,
     )
 
 
@@ -206,10 +212,10 @@ with tab2:
         df_totals=df_totals,
         df_gdp_growth=df_gdp_growth,
         df_events=df_events,
-        selected_countries=selected_countries,
+        selected_iso_codes=selected_iso_codes,
         year_range=year_range,
         show_events=show_events,
-        evt_cats=evt_cats,
+        evt_iso_codes=evt_iso_codes,
     )
 
 
@@ -220,11 +226,11 @@ with tab3:
     render_tab3_charts(
         df_s_filtered=df_s_filtered,
         df_events=df_events,
-        selected_countries=selected_countries,
+        selected_iso_codes=selected_iso_codes,
         year_range=year_range,
         latest_year=latest_year,
         show_events=show_events,
-        evt_cats=evt_cats,
+        evt_iso_codes=evt_iso_codes,
     )
 
 

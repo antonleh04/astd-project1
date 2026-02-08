@@ -16,26 +16,31 @@ from utils import add_events_to_fig
 def render_tab3_charts(
     df_s_filtered: pd.DataFrame,
     df_events: pd.DataFrame,
-    selected_countries: list[str],
+    selected_iso_codes: list[str],
     year_range: tuple[int, int],
     latest_year: int,
     show_events: bool,
-    evt_cats: list[str],
+    evt_iso_codes: list[str],
 ):
     """Render all charts for Tab 3 (Sectoral Deep Dive)."""
     
     # ── Stacked area: sector composition for one country ─────────────────────
     st.subheader("Sector Composition Over Time")
 
-    if len(selected_countries) == 1:
-        focus_country = selected_countries[0]
+    if len(selected_iso_codes) == 1:
+        focus_iso = selected_iso_codes[0]
     else:
-        focus_country = st.selectbox(
+        # Create a mapping for display
+        iso_to_name = df_s_filtered[["ISOcode", "Country"]].drop_duplicates().set_index("ISOcode")["Country"].to_dict()
+        focus_iso = st.selectbox(
             "Focus country for stacked area chart",
-            selected_countries, key="sector_focus",
+            selected_iso_codes,
+            format_func=lambda iso: iso_to_name.get(iso, iso),
+            key="sector_focus",
         )
 
-    df_focus = df_s_filtered[df_s_filtered["Country"] == focus_country]
+    df_focus = df_s_filtered[df_s_filtered["ISOcode"] == focus_iso]
+    focus_country = df_focus["Country"].iloc[0] if not df_focus.empty else focus_iso
 
     if df_focus.empty:
         st.info(f"No sector data for **{focus_country}** in this range.")
@@ -71,8 +76,8 @@ def render_tab3_charts(
         )
 
         if show_events:
-            events_sub = df_events[df_events["Country"].isin(evt_cats)]
-            add_events_to_fig(fig_area, events_sub, [focus_country], year_range)
+            events_sub = df_events[df_events["ISOcode"].isin(evt_iso_codes)]
+            add_events_to_fig(fig_area, events_sub, [focus_iso], year_range)
 
         st.plotly_chart(fig_area, use_container_width=True)
 

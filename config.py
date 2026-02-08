@@ -30,33 +30,51 @@ CHART_MARGIN = dict(l=50, r=30, t=30, b=50)
 
 
 # =============================================================================
-# COUNTRY PRESETS
+# COUNTRY PRESETS (Using ISO Codes)
 # =============================================================================
 
 COUNTRY_PRESETS: dict[str, list[str]] = {
     "Custom": [],
     "G7": [
-        "United States", "United Kingdom", "France and Monaco",
-        "Germany", "Japan", "Canada",
-        "Italy, San Marino and the Holy See",
+        "USA",  # United States
+        "GBR",  # United Kingdom
+        "FRA",  # France and Monaco
+        "DEU",  # Germany
+        "JPN",  # Japan
+        "CAN",  # Canada
+        "ITA",  # Italy, San Marino and the Holy See
     ],
     "BRICS": [
-        "Brazil", "Russia", "India", "China", "South Africa",
+        "BRA",  # Brazil
+        "RUS",  # Russia
+        "IND",  # India
+        "CHN",  # China
+        "ZAF",  # South Africa
     ],
     "EU-27": [
-        "Germany", "France and Monaco", "Italy, San Marino and the Holy See",
-        "Spain and Andorra", "Netherlands", "Belgium", "Austria", "Poland",
-        "Sweden", "Denmark", "Finland", "Ireland", "Portugal", "Greece",
-        "Czechia", "Romania", "Hungary", "Slovakia", "Bulgaria", "Croatia",
-        "Lithuania", "Slovenia", "Latvia", "Estonia", "Luxembourg", "Cyprus",
-        "Malta",
+        "DEU", "FRA", "ITA", "ESP", "NLD", "BEL", "AUT", "POL",
+        "SWE", "DNK", "FIN", "IRL", "PRT", "GRC", "CZE", "ROU",
+        "HUN", "SVK", "BGR", "HRV", "LTU", "SVN", "LVA", "EST",
+        "LUX", "CYP", "MLT",
     ],
     "Top 10 Emitters": [
-        "China", "United States", "India", "Russia", "Japan",
-        "Germany", "South Korea", "Iran", "Saudi Arabia", "Canada",
+        "CHN",  # China
+        "USA",  # United States
+        "IND",  # India
+        "RUS",  # Russia
+        "JPN",  # Japan
+        "DEU",  # Germany
+        "KOR",  # South Korea
+        "IRN",  # Iran
+        "SAU",  # Saudi Arabia
+        "CAN",  # Canada
     ],
     "Top 5 Per Capita": [
-        "Qatar", "Kuwait", "United Arab Emirates", "Bahrain", "Brunei",
+        "QAT",  # Qatar
+        "KWT",  # Kuwait
+        "ARE",  # United Arab Emirates
+        "BHR",  # Bahrain
+        "BRN",  # Brunei
     ],
 }
 

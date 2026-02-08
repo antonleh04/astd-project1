@@ -18,11 +18,11 @@ def render_tab1_charts(
     df_t_filtered: pd.DataFrame,
     df_land_area: pd.DataFrame,
     df_events: pd.DataFrame,
-    selected_countries: list[str],
+    selected_iso_codes: list[str],
     year_range: tuple[int, int],
     latest_year: int,
     show_events: bool,
-    evt_cats: list[str],
+    evt_iso_codes: list[str],
 ):
     """Render all charts for Tab 1 (The Big Picture)."""
     
@@ -43,7 +43,7 @@ def render_tab1_charts(
     )
     m2.metric("Avg Emission", f"{avg_emissions:,.1f} Mt")
     m3.metric("Variance", f"{variance:,.2e}")
-    m4.metric("Countries", len(selected_countries))
+    m4.metric("Countries", len(selected_iso_codes))
 
     st.divider()
 
@@ -51,18 +51,21 @@ def render_tab1_charts(
     st.subheader("Emissions Trend Over Time")
 
     fig_trend = go.Figure()
-    for idx, country in enumerate(selected_countries):
-        df_c = df_t_filtered[df_t_filtered["Country"] == country].sort_values("Year")
+    for idx, iso_code in enumerate(selected_iso_codes):
+        df_c = df_t_filtered[df_t_filtered["ISOcode"] == iso_code].sort_values("Year")
+        if df_c.empty:
+            continue
+        country_name = df_c["Country"].iloc[0]
         color = CLIMATE_QUALITATIVE[idx % len(CLIMATE_QUALITATIVE)]
         # Use markers only when there are few countries to keep the chart readable
-        mode = "lines+markers" if len(selected_countries) < 10 else "lines"
+        mode = "lines+markers" if len(selected_iso_codes) < 10 else "lines"
         fig_trend.add_trace(go.Scatter(
             x=df_c["Year"], y=df_c["CO2"],
-            mode=mode, name=country,
+            mode=mode, name=country_name,
             line=dict(color=color, width=2.2),
             marker=dict(size=4),
             hovertemplate=(
-                f"<b>{country}</b><br>"
+                f"<b>{country_name}</b><br>"
                 "Year: %{x}<br>"
                 "CO2: %{y:,.2f} Mt<extra></extra>"
             ),
@@ -80,8 +83,8 @@ def render_tab1_charts(
 
     # Overlay historic events if the user toggled them on
     if show_events:
-        events_sub = df_events[df_events["Country"].isin(evt_cats)]
-        add_events_to_fig(fig_trend, events_sub, selected_countries, year_range)
+        events_sub = df_events[df_events["ISOcode"].isin(evt_iso_codes)]
+        add_events_to_fig(fig_trend, events_sub, selected_iso_codes, year_range)
 
     st.plotly_chart(fig_trend, use_container_width=True)
 
@@ -96,14 +99,14 @@ def render_tab1_charts(
 
     df_land_latest = df_land_area[
         (df_land_area["Year"] == latest_year)
-        & (df_land_area["Country"].isin(selected_countries))
+        & (df_land_area["ISOcode"].isin(selected_iso_codes))
     ]
     df_co2_latest = df_t_filtered[df_t_filtered["Year"] == latest_year]
 
     df_tree = pd.merge(
-        df_co2_latest[["Country", "CO2"]],
-        df_land_latest[["Country", "Land area (sq. km)"]],
-        on="Country", how="inner",
+        df_co2_latest[["Country", "CO2", "ISOcode"]],
+        df_land_latest[["ISOcode", "Land area (sq. km)"]],
+        on="ISOcode", how="inner",
     ).dropna(subset=["Land area (sq. km)", "CO2"])
 
     if df_tree.empty:

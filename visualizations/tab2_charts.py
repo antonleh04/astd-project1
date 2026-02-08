@@ -20,10 +20,10 @@ def render_tab2_charts(
     df_totals: pd.DataFrame,
     df_gdp_growth: pd.DataFrame,
     df_events: pd.DataFrame,
-    selected_countries: list[str],
+    selected_iso_codes: list[str],
     year_range: tuple[int, int],
     show_events: bool,
-    evt_cats: list[str],
+    evt_iso_codes: list[str],
 ):
     """Render all charts for Tab 2 (Equity & Economy)."""
     
@@ -36,21 +36,22 @@ def render_tab2_charts(
 
     # Merge total and per-capita data for the selected countries and years
     df_traj = pd.merge(
-        df_t_filtered[["Country", "Year", "CO2"]],
-        df_c_filtered[["Country", "Year", "CO2_per_capita"]],
-        on=["Country", "Year"], how="inner",
-    ).sort_values(["Country", "Year"])
+        df_t_filtered[["ISOcode", "Country", "Year", "CO2"]],
+        df_c_filtered[["ISOcode", "Year", "CO2_per_capita"]],
+        on=["ISOcode", "Year"], how="inner",
+    ).sort_values(["ISOcode", "Year"])
 
     if df_traj.empty:
         st.info("No combined trajectory data for selected countries.")
     else:
         fig_traj = go.Figure()
         
-        for idx, country in enumerate(selected_countries):
-            df_country = df_traj[df_traj["Country"] == country].sort_values("Year")
+        for idx, iso_code in enumerate(selected_iso_codes):
+            df_country = df_traj[df_traj["ISOcode"] == iso_code].sort_values("Year")
             if df_country.empty:
                 continue
             
+            country_name = df_country["Country"].iloc[0]
             color = CLIMATE_QUALITATIVE[idx % len(CLIMATE_QUALITATIVE)]
             
             # Add the trajectory line with markers
@@ -58,12 +59,12 @@ def render_tab2_charts(
                 x=df_country["CO2_per_capita"],
                 y=df_country["CO2"],
                 mode="lines+markers",
-                name=country,
+                name=country_name,
                 line=dict(color=color, width=2),
                 marker=dict(size=6, color=color),
                 text=df_country["Year"],
                 hovertemplate=(
-                    f"<b>{country}</b><br>"
+                    f"<b>{country_name}</b><br>"
                     "Year: %{text}<br>"
                     "Per Capita: %{x:.2f} t/capita<br>"
                     "Total: %{y:,.2f} Mt<extra></extra>"
@@ -133,22 +134,27 @@ def render_tab2_charts(
     )
 
     # Country picker (skip if only one country selected)
-    if len(selected_countries) == 1:
-        analysis_country = selected_countries[0]
+    if len(selected_iso_codes) == 1:
+        analysis_iso = selected_iso_codes[0]
     else:
-        analysis_country = st.selectbox(
-            "Select Country for Analysis", selected_countries, key="ccf_country",
+        # Create a mapping for display
+        iso_to_name = df_totals[["ISOcode", "Country"]].drop_duplicates().set_index("ISOcode")["Country"].to_dict()
+        analysis_iso = st.selectbox(
+            "Select Country for Analysis",
+            selected_iso_codes,
+            format_func=lambda iso: iso_to_name.get(iso, iso),
+            key="ccf_country",
         )
 
     # Build aligned CO2-YoY-change and GDP-growth series
     co2_country = (
-        df_totals[df_totals["Country"] == analysis_country][["Year", "CO2"]]
+        df_totals[df_totals["ISOcode"] == analysis_iso][["Year", "CO2"]]
         .sort_values("Year").dropna()
     )
     co2_country["CO2_YoY_Change"] = co2_country["CO2"].pct_change() * 100
 
     gdp_country = (
-        df_gdp_growth[df_gdp_growth["Country"] == analysis_country]
+        df_gdp_growth[df_gdp_growth["ISOcode"] == analysis_iso]
         [["Year", "GDP Growth (annual %)"]]
         .sort_values("Year").dropna()
     )
@@ -158,10 +164,12 @@ def render_tab2_charts(
         gdp_country[["Year", "GDP Growth (annual %)"]],
         on="Year", how="inner",
     ).dropna()
+    
+    analysis_country_name = df_totals[df_totals["ISOcode"] == analysis_iso]["Country"].iloc[0] if not df_totals[df_totals["ISOcode"] == analysis_iso].empty else analysis_iso
 
     if len(merged_ccf) < 10:
         st.warning(
-            f"Insufficient data for **{analysis_country}** "
+            f"Insufficient data for **{analysis_country_name}** "
             "(need \u2265 10 overlapping years)."
         )
     else:
@@ -200,8 +208,8 @@ def render_tab2_charts(
         )
 
         if show_events:
-            events_sub = df_events[df_events["Country"].isin(evt_cats)]
-            add_events_to_fig(fig_ts, events_sub, [analysis_country], year_range)
+            events_sub = df_events[df_events["ISOcode"].isin(evt_iso_codes)]
+            add_events_to_fig(fig_ts, events_sub, [analysis_iso], year_range)
 
         st.plotly_chart(fig_ts, use_container_width=True)
 

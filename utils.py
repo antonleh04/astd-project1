@@ -14,13 +14,13 @@ import plotly.graph_objects as go
 
 def filter_events(
     events_df: pd.DataFrame,
-    selected_countries: list[str],
+    selected_iso_codes: list[str],
     year_range: tuple[int, int],
 ) -> pd.DataFrame:
     """Return events that are either global or belong to one of the selected
-    countries and fall within the chosen year range."""
-    global_mask = events_df["Country"].isin(["Global", "World"])
-    local_mask  = events_df["Country"].isin(selected_countries)
+    countries (by ISO code) and fall within the chosen year range."""
+    global_mask = events_df["ISOcode"].isin(["GLOBAL"])
+    local_mask  = events_df["ISOcode"].isin(selected_iso_codes)
     year_mask   = events_df["Year"].between(*year_range)
     return events_df[(global_mask | local_mask) & year_mask]
 
@@ -28,12 +28,12 @@ def filter_events(
 def add_events_to_fig(
     fig: go.Figure,
     events_df: pd.DataFrame,
-    selected_countries: list[str],
+    selected_iso_codes: list[str],
     year_range: tuple[int, int],
 ) -> None:
     """Overlay staggered, colour-coded event annotations on a Plotly figure.
     Annotations cycle through five vertical offsets to reduce overlap."""
-    filtered = filter_events(events_df, selected_countries, year_range)
+    filtered = filter_events(events_df, selected_iso_codes, year_range)
     if filtered.empty:
         return
 
@@ -41,7 +41,7 @@ def add_events_to_fig(
     y_positions = [0.95, 0.85, 0.75, 0.65, 0.55]
 
     for i, (_, event) in enumerate(filtered.iterrows()):
-        is_global  = event["Country"] in ["Global", "World"]
+        is_global  = event["ISOcode"] == "GLOBAL"
         icon       = "\U0001F30D" if is_global else "\U0001F4CD"
         line_color = "#4A90D9" if is_global else "#E85D3A"
         y_ref      = y_positions[i % len(y_positions)]
