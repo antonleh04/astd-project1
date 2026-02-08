@@ -221,37 +221,70 @@ def render_tab3_charts(
                 df_sec_tree["Value"] = df_sec_tree["CO2"]
                 value_label = "Emissions (Mt)"
 
-            # 2. Handle Hierarchy Strategy
+            # 2. Handle Hierarchy & Coloring Strategy
             if hierarchy_mode == "Country \u2192 Sector":
                 path = ["Country", "Sector"]
+                color_col = "Sector"
+                # Use the pre-calculated sector_colors
+                color_map = sector_colors
+                legend_items = sorted(df_sec_tree["Sector"].unique())
             else:
                 path = ["Sector", "Country"]
+                color_col = "Country"
+                # Generate country colors dynamically
+                unique_countries = sorted(df_sec_tree["Country"].unique())
+                color_map = {
+                    c: CLIMATE_QUALITATIVE[i % len(CLIMATE_QUALITATIVE)] 
+                    for i, c in enumerate(unique_countries)
+                }
+                legend_items = unique_countries
 
+            # Ensure consistent coloring matching the other charts/legend
             fig_sec_tm = px.treemap(
                 df_sec_tree,
                 path=path,
                 values="Value",
-                color="Sector",
-                color_discrete_sequence=CLIMATE_QUALITATIVE,
+                color=color_col,
+                color_discrete_map=color_map,
                 hover_data={"CO2": ":.1f"},
             )
             
             fig_sec_tm.update_traces(
+                textinfo="none",  # Remove text labels inside rectangles
                 hovertemplate=(
                     "<b>%{label}</b><br>"
                     "Parent: %{parent}<br>"
                     "CO2: %{customdata[0]:,.1f} Mt<extra></extra>"
                 ),
                 root_color="rgba(0,0,0,0)",
-                marker=dict(line=dict(width=2, color="#0E1117")) # Dark border to simulate gaps
+                marker=dict(line=dict(width=2, color="#0E1117")) # Dark border
             )
+
+            # Add invisible traces to generate a custom legend
+            for item in legend_items:
+                fig_sec_tm.add_trace(go.Scatter(
+                    x=[None], y=[None],
+                    mode="markers",
+                    name=item,
+                    marker=dict(size=12, symbol="square", color=color_map.get(item, "#333")),
+                    legendgroup=item,
+                    showlegend=True
+                ))
             
             fig_sec_tm.update_layout(
                 template=PLOTLY_TEMPLATE,
-                height=550,
-                margin=dict(l=10, r=10, t=10, b=10),
+                height=600,
+                margin=dict(l=10, r=10, t=10, b=50),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
+                legend=dict(
+                    orientation="h",
+                    yanchor="top", y=-0.05,
+                    xanchor="center", x=0.5,
+                    title=None,
+                    itemclick=False,  # Prevent interactions that might hide traces
+                    itemdoubleclick=False
+                )
             )
             st.plotly_chart(fig_sec_tm, use_container_width=True)
         else:

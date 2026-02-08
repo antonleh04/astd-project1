@@ -63,18 +63,8 @@ except FileNotFoundError as e:
 # =============================================================================
 
 with st.sidebar:
-    st.title("CO2 Dashboard")
-    # ── Navigation ───────────────────────────────────────────────────────────
-    st.header("Navigation")
-    view_selection = st.radio(
-        "Show View:",
-        [
-            "The Big Picture",
-            "Equity & Economy",
-            "Sectoral Deep Dive",
-        ],
-        label_visibility="collapsed",
-    )
+    st.title("\U0001F30D CO2 Dashboard")
+    st.caption("Explore global emissions across countries, sectors, and time.")
 
     # ── Time range slider ────────────────────────────────────────────────────
     st.header("Time Range")
@@ -180,8 +170,17 @@ df_s_filtered = df_sector[mask_sector]
 # 5. DASHBOARD HEADER & TABS
 # =============================================================================
 
-if view_selection == "The Big Picture":
-    st.header("The Big Picture")
+tab1, tab2, tab3 = st.tabs([
+    "\U0001F30D  The Big Picture",
+    "\U0001F4B0  Equity & Economy",
+    "\U0001F3ED  Sectoral Deep Dive",
+])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 1 — THE BIG PICTURE
+# ─────────────────────────────────────────────────────────────────────────────
+with tab1:
     render_tab1_charts(
         df_t_filtered=df_t_filtered,
         df_c_filtered=df_c_filtered,
@@ -193,8 +192,11 @@ if view_selection == "The Big Picture":
         evt_iso_codes=evt_iso_codes,
     )
 
-elif view_selection == "Equity & Economy":
-    st.header("Equity & Economy")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 2 — EQUITY & ECONOMY
+# ─────────────────────────────────────────────────────────────────────────────
+with tab2:
     render_tab2_charts(
         df_t_filtered=df_t_filtered,
         df_c_filtered=df_c_filtered,
@@ -207,8 +209,11 @@ elif view_selection == "Equity & Economy":
         evt_iso_codes=evt_iso_codes,
     )
 
-elif view_selection == "Sectoral Deep Dive":
-    st.header("Sectoral Deep Dive")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 3 — SECTORAL DEEP DIVE
+# ─────────────────────────────────────────────────────────────────────────────
+with tab3:
     render_tab3_charts(
         df_s_filtered=df_s_filtered,
         df_events=df_events,
