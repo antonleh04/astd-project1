@@ -125,8 +125,37 @@ CUSTOM_CSS = """
         [data-testid="stSidebar"] { background-color: #e8f0ec; }
         [data-testid="stSidebar"] h1 { color: #1B5E4B !important; }
 
-        /* Soft dividers */
+    /* Soft dividers */
         hr { border-color: #c5d8cf !important; }
+    }
+
+    /* ─── Compact Sidebar Overrides ─── */
+    [data-testid="stSidebar"] .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 3rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    [data-testid="stSidebar"] h1 {
+        font-size: 1.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    [data-testid="stSidebar"] h2 {
+        font-size: 1.1rem !important;
+        margin-top: 1rem !important;
+        margin-bottom: 0.25rem !important;
+        padding-top: 0 !important;
+    }
+    [data-testid="stSidebar"] hr {
+        margin: 0.5rem 0 1rem 0 !important;
+    }
+    [data-testid="stSidebar"] .stRadio > label {
+        display: none !important; /* Hide "Show View:" label if redundant */
+    }
+    
+    /* Reduce gap between elements */
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
+        gap: 0.5rem !important;
     }
 </style>
 """
