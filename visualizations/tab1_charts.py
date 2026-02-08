@@ -16,7 +16,7 @@ from utils import add_events_to_fig
 
 def render_tab1_charts(
     df_t_filtered: pd.DataFrame,
-    df_land_area: pd.DataFrame,
+    df_c_filtered: pd.DataFrame,
     df_events: pd.DataFrame,
     selected_iso_codes: list[str],
     year_range: tuple[int, int],
@@ -29,20 +29,41 @@ def render_tab1_charts(
     # ── KPI Metrics Row ──────────────────────────────────────────────────────
     m1, m2, m3, m4 = st.columns(4)
 
-    avg_emissions = df_t_filtered["CO2"].mean()
-    variance      = df_t_filtered["CO2"].var() if len(df_t_filtered) > 1 else 0
-
+    # 1. Latest Annual Total & YoY Change
     latest_total = df_t_filtered[df_t_filtered["Year"] == latest_year]["CO2"].sum()
     prev_total   = df_t_filtered[df_t_filtered["Year"] == latest_year - 1]["CO2"].sum()
     yoy = ((latest_total - prev_total) / prev_total * 100) if prev_total else 0
 
+    # 2. Cumulative Emissions (Sum over selected period)
+    # Climate change is driven by cumulative stock, not just flow.
+    cumulative_total = df_t_filtered["CO2"].sum()
+
+    # 3. Compound Annual Growth Rate (CAGR)
+    # Smoothed trend over the entire selected period
+    start_year = df_t_filtered["Year"].min()
+    start_total = df_t_filtered[df_t_filtered["Year"] == start_year]["CO2"].sum()
+    
+    if start_total > 0 and latest_year > start_year:
+        years_diff = latest_year - start_year
+        cagr = ((latest_total / start_total) ** (1 / years_diff)) - 1
+    else:
+        cagr = 0.0
+
     # delta_color="inverse" → green when emissions decrease (good for climate)
     m1.metric(
-        "Latest Total", f"{latest_total:,.0f} Mt", f"{yoy:+.1f}% YoY",
+        "Latest Annual Total", f"{latest_total:,.0f} Mt", f"{yoy:+.1f}% YoY",
         delta_color="inverse",
     )
-    m2.metric("Avg Emission", f"{avg_emissions:,.1f} Mt")
-    m3.metric("Variance", f"{variance:,.2e}")
+    m2.metric(
+        "Cumulative Total", 
+        f"{cumulative_total / 1000:,.1f} Gt",
+        help="Total emissions accumulated over the selected time range (Gigatonnes)."
+    )
+    m3.metric(
+        "Trend (CAGR)", 
+        f"{cagr * 100:+.2f}%",
+        help=f"Compound Annual Growth Rate from {start_year} to {latest_year}."
+    )
     m4.metric("Countries", len(selected_iso_codes))
 
     st.divider()
@@ -90,46 +111,62 @@ def render_tab1_charts(
 
     st.divider()
 
-    # ── Treemap: land area sized, CO2 coloured ──────────────────────────────
-    st.subheader(f"Emissions Treemap by Land Area ({latest_year})")
+    # ── Treemap: Emissions sized, Per Capita coloured ──────────────────────
+    st.subheader(f"Global Emissions Hierarchy ({latest_year})")
     st.caption(
-        "Each rectangle is proportional to the country's land area; the colour "
-        "intensity shows CO2 emissions on a **log scale**."
+        "Each rectangle is **proportional to Total Emissions**. "
+        "The colour intensity shows **Emissions Per Capita** (Red = High Intensity)."
     )
 
-    df_land_latest = df_land_area[
-        (df_land_area["Year"] == latest_year)
-        & (df_land_area["ISOcode"].isin(selected_iso_codes))
-    ]
     df_co2_latest = df_t_filtered[df_t_filtered["Year"] == latest_year]
+    df_capita_latest = df_c_filtered[
+        (df_c_filtered["Year"] == latest_year)
+        & (df_c_filtered["ISOcode"].isin(selected_iso_codes))
+    ]
 
     df_tree = pd.merge(
         df_co2_latest[["Country", "CO2", "ISOcode"]],
-        df_land_latest[["ISOcode", "Land area (sq. km)"]],
+        df_capita_latest[["ISOcode", "CO2_per_capita"]],
         on="ISOcode", how="inner",
-    ).dropna(subset=["Land area (sq. km)", "CO2"])
+    ).dropna(subset=["CO2", "CO2_per_capita"])
 
     if df_tree.empty:
-        st.info("No matching land-area data for the selected countries / year.")
+        st.info("No matching data for the selected countries / year.")
     else:
-        df_tree["CO2_log"] = np.log10(df_tree["CO2"].clip(lower=1))
+        # Construct a custom continuous scale using the project's specific palette
+        # Sea Green (Good) -> Gold (Avg) -> Warm Red-Orange (Bad)
+        custom_scale = [
+            CLIMATE_QUALITATIVE[2], 
+            CLIMATE_QUALITATIVE[3], 
+            CLIMATE_QUALITATIVE[1]
+        ]
+        
+        # Create descriptive hover text
         fig_treemap = px.treemap(
             df_tree,
             path=["Country"],
-            values="Land area (sq. km)",
-            color="CO2_log",
-            color_continuous_scale="YlOrRd",
-            hover_data={"CO2": ":.2f", "CO2_log": False},
-            labels={"CO2_log": "CO2 (log)"},
+            values="CO2",
+            color="CO2_per_capita",
+            color_continuous_scale=custom_scale,
+            hover_data={"CO2": ":.1f", "CO2_per_capita": ":.2f"},
+            labels={
+                "CO2": "Total Emissions (Mt)",
+                "CO2_per_capita": "Per Capita (t)"
+            },
         )
+        
+        # Center the color scale roughly around global sustainable targets or average
+        # Global Avg is ~4.7t. We set a midpoint to make the "Green vs Red" distinction clearer.
         fig_treemap.update_coloraxes(
-            colorbar_title_text="CO2 (Mt, log\u2081\u2080)",
-            colorbar_tickmode="array",
-            colorbar_tickvals=np.log10([1, 10, 100, 1000, 10000]),
-            colorbar_ticktext=["1", "10", "100", "1 k", "10 k"],
+            cmin=0,
+            cmid=df_tree["CO2_per_capita"].median(), 
+            colorbar_title_text="Per Capita (t)",
+            colorbar_thickness=15,
         )
+        
         fig_treemap.update_layout(
             template=PLOTLY_TEMPLATE,
-            margin=dict(l=10, r=10, t=30, b=10),
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=500,
         )
         st.plotly_chart(fig_treemap, use_container_width=True)

@@ -23,7 +23,6 @@ from config import COUNTRY_PRESETS, CUSTOM_CSS
 from data_loader import (
     load_co2_data,
     load_events_data,
-    load_land_area_data,
     load_gdp_data,
 )
 from visualizations import render_tab1_charts, render_tab2_charts, render_tab3_charts
@@ -50,9 +49,6 @@ try:
     df_totals, df_capita, df_sector = load_co2_data("datasets/co2_data")
     df_events = load_events_data(
         "datasets/Top_20_GDP_CO2_Events_1970_2022.csv",
-    )
-    df_land_area = load_land_area_data(
-        "datasets/land_area_data/API_AG.LND.TOTL.K2_DS2_en_csv_v2_323.csv",
     )
     df_gdp_growth = load_gdp_data(
         "datasets/gdp_data/API_NY.GDP.MKTP.KD.ZG_DS2_en_csv_v2_40824.csv",
@@ -192,7 +188,7 @@ tab1, tab2, tab3 = st.tabs([
 with tab1:
     render_tab1_charts(
         df_t_filtered=df_t_filtered,
-        df_land_area=df_land_area,
+        df_c_filtered=df_c_filtered,
         df_events=df_events,
         selected_iso_codes=selected_iso_codes,
         year_range=year_range,

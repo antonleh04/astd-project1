@@ -44,22 +44,6 @@ def load_co2_data(co2_data_dir: str):
 
 
 @st.cache_data
-def load_land_area_data(file_path: str) -> pd.DataFrame:
-    """Load World Bank land-area indicator and melt from wide to long format."""
-    df = pd.read_csv(file_path, skiprows=4)
-    df = df.melt(
-        id_vars=["Country Name", "Country Code", "Indicator Name", "Indicator Code"],
-        var_name="Year", value_name="Land area (sq. km)",
-    )
-    df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
-    df.dropna(subset=["Year"], inplace=True)
-    df["Year"] = df["Year"].astype(int)
-    df.rename(columns={"Country Name": "Country", "Country Code": "ISOcode"}, inplace=True)
-    df["Land area (sq. km)"] = pd.to_numeric(df["Land area (sq. km)"], errors="coerce")
-    return df
-
-
-@st.cache_data
 def load_gdp_data(file_path: str) -> pd.DataFrame:
     """Load World Bank GDP-growth indicator and melt from wide to long format."""
     df = pd.read_csv(file_path, skiprows=4)
