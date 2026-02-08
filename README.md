@@ -2,7 +2,7 @@
 
 This project is a Streamlit application for analyzing CO2 emissions data.
 
-## 📁 Project Structure
+## Project Structure
 
 The codebase has been **refactored into a modular structure**. See [STRUCTURE.md](STRUCTURE.md) for detailed documentation.
 

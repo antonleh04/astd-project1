@@ -5,69 +5,41 @@ Centralized configuration for the CO2 Dashboard including color palettes,
 chart settings, and country group presets.
 """
 
-# =============================================================================
-# COLOUR PALETTES & CHART SETTINGS
-# =============================================================================
-
-# 12-colour qualitative palette designed for climate/environment charts.
 CLIMATE_QUALITATIVE: list[str] = [
-    "#1B5E4B",  # deep teal
-    "#E85D3A",  # warm red-orange
-    "#2E8B57",  # sea green
-    "#D4A843",  # gold
-    "#4A90D9",  # steel blue
-    "#8B5E3C",  # brown
-    "#6A5ACD",  # slate blue
-    "#20B2AA",  # light sea green
-    "#CD5C5C",  # indian red
-    "#708090",  # slate grey
-    "#DAA520",  # goldenrod
-    "#2F4F4F",  # dark slate
+    "#1B5E4B",
+    "#E85D3A",
+    "#2E8B57",
+    "#D4A843",
+    "#4A90D9",
+    "#8B5E3C",
+    "#6A5ACD",
+    "#20B2AA",
+    "#CD5C5C",
+    "#708090",
+    "#DAA520",
+    "#2F4F4F",
 ]
 
-# Semantic color aliases for specific use cases across charts
 COLORS = {
-    # Data series
-    "co2_change": "#E85D3A",     # warm red-orange for CO2/emissions changes
-    "gdp_growth": "#4A90D9",     # steel blue for economic indicators
-    # Value judgements
-    "positive": "#2E8B57",       # sea green for positive/good values
-    "negative": "#E85D3A",       # red-orange for negative/bad values
-    "neutral": "#708090",        # slate grey for neutral elements
-    # Event annotations
-    "global_event": "#4A90D9",   # blue for global events
-    "local_event": "#E85D3A",    # red-orange for country-specific events
-    # Chart elements
-    "stem_line": "#c5d8cf",      # light color for lollipop chart stems
-    "zero_line": "#708090",      # slate grey for zero reference lines
+    "co2_change": "#E85D3A",
+    "gdp_growth": "#4A90D9",
+    "positive": "#2E8B57",
+    "negative": "#E85D3A",
+    "neutral": "#708090",
+    "global_event": "#4A90D9",
+    "local_event": "#E85D3A",
+    "stem_line": "#c5d8cf",
+    "zero_line": "#708090",
 }
 
 PLOTLY_TEMPLATE = "plotly_white"
 CHART_MARGIN = dict(l=50, r=30, t=30, b=50)
 
 
-# =============================================================================
-# COUNTRY PRESETS (Using ISO Codes)
-# =============================================================================
-
 COUNTRY_PRESETS: dict[str, list[str]] = {
     "Custom": [],
-    "G7": [
-        "USA",  # United States
-        "GBR",  # United Kingdom
-        "FRA",  # France and Monaco
-        "DEU",  # Germany
-        "JPN",  # Japan
-        "CAN",  # Canada
-        "ITA",  # Italy, San Marino and the Holy See
-    ],
-    "BRICS": [
-        "BRA",  # Brazil
-        "RUS",  # Russia
-        "IND",  # India
-        "CHN",  # China
-        "ZAF",  # South Africa
-    ],
+    "G7": ["USA", "GBR", "FRA", "DEU", "JPN", "CAN", "ITA"],
+    "BRICS": ["BRA", "RUS", "IND", "CHN", "ZAF"],
     "EU-27": [
         "DEU", "FRA", "ITA", "ESP", "NLD", "BEL", "AUT", "POL",
         "SWE", "DNK", "FIN", "IRL", "PRT", "GRC", "CZE", "ROU",
@@ -75,30 +47,11 @@ COUNTRY_PRESETS: dict[str, list[str]] = {
         "LUX", "CYP", "MLT",
     ],
     "Top 10 Emitters": [
-        "CHN",  # China
-        "USA",  # United States
-        "IND",  # India
-        "RUS",  # Russia
-        "JPN",  # Japan
-        "DEU",  # Germany
-        "KOR",  # South Korea
-        "IRN",  # Iran
-        "SAU",  # Saudi Arabia
-        "CAN",  # Canada
+        "CHN", "USA", "IND", "RUS", "JPN", "DEU", "KOR", "IRN", "SAU", "CAN",
     ],
-    "Top 5 Per Capita": [
-        "QAT",  # Qatar
-        "KWT",  # Kuwait
-        "ARE",  # United Arab Emirates
-        "BHR",  # Bahrain
-        "BRN",  # Brunei
-    ],
+    "Top 5 Per Capita": ["QAT", "KWT", "ARE", "BHR", "BRN"],
 }
 
-
-# =============================================================================
-# CUSTOM CSS
-# =============================================================================
 
 CUSTOM_CSS = """
 <style>    

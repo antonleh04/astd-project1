@@ -10,10 +10,6 @@ import plotly.graph_objects as go
 from config import COLORS
 
 
-# =============================================================================
-# EVENT HELPERS
-# =============================================================================
-
 def filter_events(
     events_df: pd.DataFrame,
     selected_iso_codes: list[str],

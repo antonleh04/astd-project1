@@ -27,14 +27,13 @@ def render_tab2_charts(
 ):
     """Render all charts for Tab 2 (Equity & Economy)."""
 
-    # ── Emissions Trajectory: Per Capita vs Total ────────────────────────────
+
     st.subheader("Emissions Trajectory: Per Capita vs Total")
     st.caption(
         "Press Play to watch each country's path through emissions space over time. "
         "The trajectory shows how total and per-capita emissions evolve together."
     )
 
-    # Merge total and per-capita data for the selected countries and years
     df_traj = pd.merge(
         df_t_filtered[["ISOcode", "Country", "Year", "CO2"]],
         df_c_filtered[["ISOcode", "Year", "CO2_per_capita"]],
@@ -44,8 +43,6 @@ def render_tab2_charts(
     if df_traj.empty:
         st.info("No combined trajectory data for selected countries.")
     else:
-        # ── Build animated trajectory ──
-        # Collect per-country data
         country_data = {}
         for idx, iso_code in enumerate(selected_iso_codes):
             df_country = df_traj[df_traj["ISOcode"] == iso_code].sort_values("Year")
@@ -62,13 +59,10 @@ def render_tab2_charts(
         if not country_data:
             st.info("No trajectory data available for the selected countries.")
         else:
-            # Determine the union of all years across selected countries
             all_years = sorted(df_traj["Year"].unique())
 
-            # ── Base figure: empty traces (one line + one head-marker per country) ──
             fig_traj = go.Figure()
             for iso_code, cdata in country_data.items():
-                # Trajectory line (starts empty)
                 fig_traj.add_trace(go.Scatter(
                     x=[], y=[],
                     mode="lines+markers",
@@ -82,7 +76,6 @@ def render_tab2_charts(
                         "Total: %{y:,.2f} Mt<extra></extra>"
                     ),
                 ))
-                # Moving head marker (current year dot)
                 fig_traj.add_trace(go.Scatter(
                     x=[], y=[],
                     mode="markers+text",
@@ -94,7 +87,6 @@ def render_tab2_charts(
                     hoverinfo="skip",
                 ))
 
-            # ── Build frames: each frame shows data up to that year ──
             frames = []
             for yi, year in enumerate(all_years):
                 frame_data = []
@@ -102,7 +94,6 @@ def render_tab2_charts(
                     df_c = cdata["df"]
                     df_up_to = df_c[df_c["Year"] <= year]
 
-                    # Line trace (cumulative)
                     frame_data.append(go.Scatter(
                         x=df_up_to["CO2_per_capita"],
                         y=df_up_to["CO2"],
@@ -112,7 +103,6 @@ def render_tab2_charts(
                         text=df_up_to["Year"],
                     ))
 
-                    # Head marker (only the latest point up to this year)
                     if not df_up_to.empty:
                         last = df_up_to.iloc[-1]
                         frame_data.append(go.Scatter(
@@ -136,7 +126,6 @@ def render_tab2_charts(
 
             fig_traj.frames = frames
 
-            # ── Axis ranges (fixed so the view doesn't jump) ──
             x_min = df_traj["CO2_per_capita"].min()
             x_max = df_traj["CO2_per_capita"].max()
             y_min = df_traj["CO2"].min()
@@ -144,11 +133,9 @@ def render_tab2_charts(
             x_pad = (x_max - x_min) * 0.08 or 1
             y_pad = (y_max - y_min) * 0.08 or 1
 
-            # ── Determine sensible animation speed ──
             n_years = len(all_years)
             frame_dur = max(40, min(300, int(10_000 / max(n_years, 1))))
 
-            # ── Layout with Play / Pause / Slider ──
             fig_traj.update_layout(
                 template=PLOTLY_TEMPLATE,
                 xaxis=dict(
@@ -242,7 +229,7 @@ def render_tab2_charts(
             )
 
             st.caption(
-                "◆ Diamond marker follows the latest data point for each country. "
+                "Diamond marker follows the latest data point for each country. "
                 "Use the slider to scrub to a specific year."
             )
 
@@ -255,7 +242,7 @@ def render_tab2_charts(
 
     st.divider()
 
-    # ── Cross-Correlation: GDP Growth vs CO2 Change ──────────────────────────
+
     st.subheader("Cross-Correlation: GDP Growth vs CO2 Change")
     st.caption(
         "Analyse the temporal relationship between economic growth and emissions "
@@ -263,7 +250,6 @@ def render_tab2_charts(
         "changes *precede* GDP."
     )
 
-    # Country picker (skip if only one country selected)
     if len(selected_iso_codes) == 1:
         analysis_iso = selected_iso_codes[0]
     else:
@@ -275,7 +261,6 @@ def render_tab2_charts(
             key="ccf_country",
         )
 
-    # Build aligned CO2-YoY-change and GDP-growth series
     co2_country = (
         df_totals[df_totals["ISOcode"] == analysis_iso][["Year", "CO2"]]
         .sort_values("Year").dropna()
@@ -302,7 +287,6 @@ def render_tab2_charts(
             "(need ≥ 10 overlapping years)."
         )
     else:
-        # -- Dual-axis time-series overlay --
         fig_ts = go.Figure()
         fig_ts.add_trace(go.Scatter(
             x=merged_ccf["Year"], y=merged_ccf["CO2_YoY_Change"],
@@ -342,8 +326,6 @@ def render_tab2_charts(
 
         st.plotly_chart(fig_ts, use_container_width=True)
 
-        # -- CCF lollipop chart (Static lag range) --
-        # We target a max lag of 10 years, but ensure we don't exceed 1/3 of the data length
         target_lag = 10
         limit_by_data = len(merged_ccf) // 3
         max_lag = min(target_lag, limit_by_data)
@@ -355,10 +337,8 @@ def render_tab2_charts(
             co2_series = merged_ccf["CO2_YoY_Change"].values
 
             try:
-                # Calculate CCF (numpy implementation usually returns [0...2*n-1] or [0...lag])
-                # Statsmodels ccf returns forward correlations. We construct lags manually.
                 ccf_pos = ccf(co2_series, gdp_series, adjusted=False)
-                ccf_neg = ccf(gdp_series, co2_series, adjusted=False) # Swapped for negative lags
+                ccf_neg = ccf(gdp_series, co2_series, adjusted=False)
 
                 # Build symmetric lag array [-max_lag ... +max_lag]
                 lags = np.arange(-max_lag, max_lag + 1)
@@ -370,10 +350,8 @@ def render_tab2_charts(
                     else:
                         ccf_subset.append(ccf_pos[lag])
 
-                # Draw stem (stick) for each lag value
                 fig_ccf = go.Figure()
-                
-                # Draw the vertical lines (stems)
+
                 for lag_v, corr_v in zip(lags, ccf_subset):
                     fig_ccf.add_trace(go.Scatter(
                         x=[lag_v, lag_v], y=[0, corr_v],
@@ -382,7 +360,6 @@ def render_tab2_charts(
                         showlegend=False, hoverinfo="skip",
                     ))
 
-                # Coloured markers on top of each stem
                 colors_ccf = [
                     COLORS["negative"] if c < 0 else COLORS["positive"] for c in ccf_subset
                 ]
@@ -413,7 +390,6 @@ def render_tab2_charts(
                 )
                 st.plotly_chart(fig_ccf, use_container_width=True)
 
-                # Interpret the peak automatically
                 peak_idx = int(np.argmax(np.abs(ccf_subset)))
                 peak_lag = int(lags[peak_idx])
                 peak_corr = ccf_subset[peak_idx]

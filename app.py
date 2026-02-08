@@ -28,10 +28,6 @@ from data_loader import (
 from visualizations import render_tab1_charts, render_tab2_charts, render_tab3_charts
 
 
-# =============================================================================
-# 1. PAGE CONFIG & CSS THEMING
-# =============================================================================
-
 st.set_page_config(
     page_title="ALLSTAT CO2 Dashboard",
     layout="wide",
@@ -39,10 +35,6 @@ st.set_page_config(
 
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-
-# =============================================================================
-# 2. LOAD ALL DATASETS
-# =============================================================================
 
 try:
     df_totals, df_capita, df_sector = load_co2_data("datasets/co2_data")
@@ -57,14 +49,10 @@ except FileNotFoundError as e:
     st.stop()
 
 
-# =============================================================================
-# 3. SIDEBAR — Filters & Presets
-# =============================================================================
-
 with st.sidebar:
     st.title("CO2 Dashboard")
 
-    # ── Time range slider ────────────────────────────────────────────────────
+
     st.header("Time Range")
     min_y = int(df_totals["Year"].min())
     max_y = int(df_totals["Year"].max())
@@ -72,10 +60,9 @@ with st.sidebar:
         "Select period", min_y, max_y, (1970, max_y),
     )
 
-    # ── Country selection with preset groups ─────────────────────────────────
+
     st.header("Country Selection")
-    
-    # Get available countries with their ISO codes
+
     country_lookup = df_totals[["ISOcode", "Country"]].drop_duplicates().set_index("ISOcode")["Country"].to_dict()
     available_iso_codes: list[str] = sorted(country_lookup.keys())
 
@@ -115,7 +102,6 @@ with st.sidebar:
 
     st.caption(f"**{len(selected_iso_codes)}** countries selected")
 
-    # ── Timeline Settings ─────────────────────────────────────────────────
     st.header("Timeline")
     show_events = st.checkbox(
         "Show Historic Events", value=False, key="evt_global",
@@ -126,20 +112,14 @@ with st.sidebar:
             "Filter by origin", event_origins, default=event_origins,
             key="evt_cats_global",
         )
-        # Convert country names to ISO codes for filtering
         evt_iso_codes = df_events[df_events["Country"].isin(evt_origins)]["ISOcode"].unique().tolist()
     else:
         evt_iso_codes = []
 
-# Guard: nothing to show without at least one country
 if not selected_iso_codes:
     st.warning("Please select at least one country to view the dashboard.")
     st.stop()
 
-
-# =============================================================================
-# 4. FILTER DATA BY ISO CODE
-# =============================================================================
 
 mask_totals = (
     df_totals["ISOcode"].isin(selected_iso_codes)
@@ -164,10 +144,6 @@ mask_sector = (
 df_s_filtered = df_sector[mask_sector]
 
 
-# =============================================================================
-# 5. DASHBOARD HEADER & TABS
-# =============================================================================
-
 tab1, tab2, tab3 = st.tabs([
     "The Big Picture",
     "Equity & Economy",
@@ -175,9 +151,6 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 1 — THE BIG PICTURE
-# ─────────────────────────────────────────────────────────────────────────────
 with tab1:
     render_tab1_charts(
         df_t_filtered=df_t_filtered,
@@ -191,9 +164,6 @@ with tab1:
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 2 — EQUITY & ECONOMY
-# ─────────────────────────────────────────────────────────────────────────────
 with tab2:
     render_tab2_charts(
         df_t_filtered=df_t_filtered,
@@ -208,9 +178,6 @@ with tab2:
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TAB 3 — SECTORAL DEEP DIVE
-# ─────────────────────────────────────────────────────────────────────────────
 with tab3:
     render_tab3_charts(
         df_s_filtered=df_s_filtered,
@@ -223,9 +190,6 @@ with tab3:
     )
 
 
-# =============================================================================
-# 6. FOOTER
-# =============================================================================
 st.divider()
 st.caption(
     "Data: [EDGAR v8.0](https://edgar.jrc.ec.europa.eu/) · "
