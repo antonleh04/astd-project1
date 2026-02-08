@@ -63,7 +63,6 @@ except FileNotFoundError as e:
 
 with st.sidebar:
     st.title("CO2 Dashboard")
-    st.caption("Explore global emissions across countries, sectors, and time.")
 
     # ── Time range slider ────────────────────────────────────────────────────
     st.header("Time Range")
