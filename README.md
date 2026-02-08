@@ -4,8 +4,6 @@ This project is a Streamlit application for analyzing CO2 emissions data.
 
 ## Project Structure
 
-The codebase has been **refactored into a modular structure**. See [STRUCTURE.md](STRUCTURE.md) for detailed documentation.
-
 **Quick overview:**
 - `app.py` - Main Streamlit application (entry point, ~250 lines)
 - `config.py` - Configuration, constants, and color palettes
